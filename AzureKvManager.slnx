@@ -1,0 +1,5 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/AzureKvManager.Tui/AzureKvManager.Tui.csproj" />
+  </Folder>
+</Solution>
