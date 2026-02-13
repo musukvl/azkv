@@ -24,6 +24,7 @@ echo "Building for: $RID"
 dotnet publish src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
     -c Release \
     -r $RID \
+    -p:PublishSingleFile=true \
     --self-contained \
     -o ./publish/$RID \
     -p:PublishSingleFile=true

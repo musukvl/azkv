@@ -55,21 +55,12 @@ echo -e "Tag: ${YELLOW}${TAG}${NC}"
 echo -e "Release Notes: ${YELLOW}${RELEASE_NOTES_FILE}${NC}"
 echo ""
 
-# Confirm
-read -p "Continue with release? (y/n) " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "Aborted."
-    exit 1
-fi
 
 # Clean previous builds
 echo ""
 echo -e "${GREEN}Cleaning previous builds...${NC}"
 rm -rf ./publish
-rm -f azkv-${VERSION}-*.tar.gz
-rm -f azkv-${VERSION}-*.zip
-rm -f azkv-${VERSION}-*.sha256
+mkdir -p ./publish
 
 # Detect current architecture
 ARCH=$(uname -m)
@@ -92,9 +83,10 @@ if [ "$ARCH" = "arm64" ]; then
     
     cd publish/osx-arm64
     mv AzureKvManager.Tui azkv
-    tar -czf ../../azkv-${VERSION}-osx-arm64.tar.gz azkv
-    cd ../..
+    tar -czf ../azkv-${VERSION}-osx-arm64.tar.gz azkv
+    cd ..
     shasum -a 256 azkv-${VERSION}-osx-arm64.tar.gz > azkv-${VERSION}-osx-arm64.tar.gz.sha256
+    cd ..
     echo -e "${GREEN}✓ macOS ARM64 build complete${NC}"
 fi
 
@@ -113,9 +105,10 @@ dotnet publish src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
 
 cd publish/osx-x64
 mv AzureKvManager.Tui azkv
-tar -czf ../../azkv-${VERSION}-osx-x64.tar.gz azkv
-cd ../..
+tar -czf ../azkv-${VERSION}-osx-x64.tar.gz azkv
+cd ..
 shasum -a 256 azkv-${VERSION}-osx-x64.tar.gz > azkv-${VERSION}-osx-x64.tar.gz.sha256
+cd ..
 echo -e "${GREEN}✓ macOS x64 build complete${NC}"
 
 # Build for Linux x64
@@ -133,9 +126,10 @@ dotnet publish src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
 
 cd publish/linux-x64
 mv AzureKvManager.Tui azkv
-tar -czf ../../azkv-${VERSION}-linux-x64.tar.gz azkv
-cd ../..
+tar -czf ../azkv-${VERSION}-linux-x64.tar.gz azkv
+cd ..
 shasum -a 256 azkv-${VERSION}-linux-x64.tar.gz > azkv-${VERSION}-linux-x64.tar.gz.sha256
+cd ..
 echo -e "${GREEN}✓ Linux x64 build complete${NC}"
 
 # Build for Windows x64
@@ -153,9 +147,10 @@ dotnet publish src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
 
 cd publish/win-x64
 mv AzureKvManager.Tui.exe azkv.exe
-zip ../../azkv-${VERSION}-win-x64.zip azkv.exe
-cd ../..
+zip ../azkv-${VERSION}-win-x64.zip azkv.exe
+cd ..
 shasum -a 256 azkv-${VERSION}-win-x64.zip > azkv-${VERSION}-win-x64.zip.sha256
+cd ..
 echo -e "${GREEN}✓ Windows x64 build complete${NC}"
 
 # Display checksums
@@ -165,16 +160,16 @@ echo -e "${GREEN}SHA256 Checksums:${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "${YELLOW}macOS ARM64:${NC}"
-cat azkv-${VERSION}-osx-arm64.tar.gz.sha256 2>/dev/null || echo "Not built (not on ARM64 Mac)"
+cat publish/azkv-${VERSION}-osx-arm64.tar.gz.sha256 2>/dev/null || echo "Not built (not on ARM64 Mac)"
 echo ""
 echo -e "${YELLOW}macOS x64:${NC}"
-cat azkv-${VERSION}-osx-x64.tar.gz.sha256
+cat publish/azkv-${VERSION}-osx-x64.tar.gz.sha256
 echo ""
 echo -e "${YELLOW}Linux x64:${NC}"
-cat azkv-${VERSION}-linux-x64.tar.gz.sha256
+cat publish/azkv-${VERSION}-linux-x64.tar.gz.sha256
 echo ""
 echo -e "${YELLOW}Windows x64:${NC}"
-cat azkv-${VERSION}-win-x64.zip.sha256
+cat publish/azkv-${VERSION}-win-x64.zip.sha256
 echo ""
 
 # Create git tag
@@ -190,6 +185,15 @@ git tag -a ${TAG} -m "Release version ${VERSION}" 2>/dev/null || {
 echo -e "${GREEN}Pushing tag to GitHub...${NC}"
 git push origin ${TAG} --force
 
+
+# Confirm
+read -p "Continue with release? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo "Aborted."
+    exit 1
+fi
+
 # Create GitHub release
 echo ""
 echo -e "${GREEN}Creating GitHub release...${NC}"
@@ -201,9 +205,9 @@ gh release delete ${TAG} --yes 2>/dev/null || true
 gh release create ${TAG} \
     --title "Release ${TAG}" \
     --notes-file "${RELEASE_NOTES_FILE}" \
-    azkv-${VERSION}-*.tar.gz \
-    azkv-${VERSION}-*.zip \
-    azkv-${VERSION}-*.sha256
+    publish/azkv-${VERSION}-*.tar.gz \
+    publish/azkv-${VERSION}-*.zip \
+    publish/azkv-${VERSION}-*.sha256
 
 echo ""
 echo -e "${GREEN}========================================${NC}"

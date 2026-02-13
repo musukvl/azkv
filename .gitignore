@@ -60,3 +60,6 @@ artifacts/
 ## Temporary scripts
 __tmp_scripts/
 publish/
+*.tar.gz
+*.zip
+*.sha256
