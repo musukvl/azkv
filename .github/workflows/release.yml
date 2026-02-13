@@ -30,7 +30,7 @@ jobs:
           - os: macos
             arch: x64
             rid: osx-x64
-            runner: macos-13
+            runner: macos-12
             archive: tar.gz
           
           # Linux builds
