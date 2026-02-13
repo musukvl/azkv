@@ -1,0 +1,263 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.0.0)'
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build ${{ matrix.os }} ${{ matrix.arch }}
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        include:
+          # macOS builds
+          - os: macos
+            arch: arm64
+            rid: osx-arm64
+            runner: macos-14
+            archive: tar.gz
+          - os: macos
+            arch: x64
+            rid: osx-x64
+            runner: macos-13
+            archive: tar.gz
+          
+          # Linux builds
+          - os: linux
+            arch: x64
+            rid: linux-x64
+            runner: ubuntu-latest
+            archive: tar.gz
+          - os: linux
+            arch: arm64
+            rid: linux-arm64
+            runner: ubuntu-latest
+            archive: tar.gz
+          
+          # Windows builds
+          - os: windows
+            arch: x64
+            rid: win-x64
+            runner: windows-latest
+            archive: zip
+          - os: windows
+            arch: arm64
+            rid: win-arm64
+            runner: windows-latest
+            archive: zip
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Restore dependencies
+        run: dotnet restore src/AzureKvManager.Tui/AzureKvManager.Tui.csproj
+
+      - name: Build and Publish
+        run: |
+          dotnet publish src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained \
+            -o ./publish/${{ matrix.rid }} \
+            -p:PublishSingleFile=true \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -p:AssemblyVersion=${{ steps.version.outputs.VERSION }} \
+            -p:FileVersion=${{ steps.version.outputs.VERSION }}
+
+      - name: Prepare artifacts (Unix)
+        if: matrix.archive == 'tar.gz'
+        shell: bash
+        run: |
+          cd publish/${{ matrix.rid }}
+          if [ "${{ matrix.os }}" == "macos" ]; then
+            BINARY_NAME="azkv"
+          else
+            BINARY_NAME="azkv"
+          fi
+          
+          # Rename binary to azkv
+          if [ -f "AzureKvManager.Tui" ]; then
+            mv AzureKvManager.Tui $BINARY_NAME
+          fi
+          
+          # Create archive
+          tar -czf ../../azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz $BINARY_NAME
+          cd ../..
+          
+          # Generate SHA256
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            shasum -a 256 azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz > azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz.sha256
+          else
+            sha256sum azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz > azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz.sha256
+          fi
+
+      - name: Prepare artifacts (Windows)
+        if: matrix.archive == 'zip'
+        shell: pwsh
+        run: |
+          cd publish/${{ matrix.rid }}
+          
+          # Rename binary to azkv.exe
+          if (Test-Path "AzureKvManager.Tui.exe") {
+            Rename-Item -Path "AzureKvManager.Tui.exe" -NewName "azkv.exe"
+          }
+          
+          # Create archive
+          Compress-Archive -Path "azkv.exe" -DestinationPath "../../azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip"
+          cd ../..
+          
+          # Generate SHA256
+          $hash = Get-FileHash -Algorithm SHA256 -Path "azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip"
+          "$($hash.Hash.ToLower())  azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip" | Out-File -FilePath "azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip.sha256" -Encoding ASCII
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: azkv-${{ matrix.rid }}
+          path: |
+            azkv-${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.*
+          retention-days: 5
+
+  release:
+    name: Create Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get version from tag
+        id: version
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            TAG="v$VERSION"
+          else
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG=${GITHUB_REF#refs/tags/}
+          fi
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+          echo "TAG=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: Prepare release assets
+        run: |
+          mkdir -p ./release
+          find ./artifacts -type f -name "azkv-*" -exec cp {} ./release/ \;
+          ls -lah ./release
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          cat > release-notes.md << 'EOF'
+          ## Azure Key Vault Manager v${{ steps.version.outputs.VERSION }}
+          
+          ### Installation
+          
+          #### macOS (Homebrew)
+          ```bash
+          brew tap musukvl/azkv
+          brew install azkv
+          ```
+          
+          #### Manual Installation
+          
+          Download the appropriate archive for your platform:
+          
+          - **macOS Apple Silicon**: `azkv-${{ steps.version.outputs.VERSION }}-osx-arm64.tar.gz`
+          - **macOS Intel**: `azkv-${{ steps.version.outputs.VERSION }}-osx-x64.tar.gz`
+          - **Linux x64**: `azkv-${{ steps.version.outputs.VERSION }}-linux-x64.tar.gz`
+          - **Linux ARM64**: `azkv-${{ steps.version.outputs.VERSION }}-linux-arm64.tar.gz`
+          - **Windows x64**: `azkv-${{ steps.version.outputs.VERSION }}-win-x64.zip`
+          - **Windows ARM64**: `azkv-${{ steps.version.outputs.VERSION }}-win-arm64.zip`
+          
+          Extract the archive and move the binary to your PATH.
+          
+          ### Verification
+          
+          SHA256 checksums are provided for each archive. Verify with:
+          ```bash
+          # macOS/Linux
+          sha256sum -c azkv-${{ steps.version.outputs.VERSION }}-<platform>.tar.gz.sha256
+          
+          # Windows (PowerShell)
+          Get-FileHash azkv-${{ steps.version.outputs.VERSION }}-<platform>.zip -Algorithm SHA256
+          ```
+          
+          ### Prerequisites
+          
+          - Azure CLI (`az`) must be installed and configured
+          - Run `az login` before using the application
+          
+          ### What's Changed
+          
+          <!-- Add release notes here -->
+          
+          EOF
+          
+          cat release-notes.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ steps.version.outputs.TAG }}
+          name: Release ${{ steps.version.outputs.TAG }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: |
+            ./release/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate Homebrew formula update instructions
+        run: |
+          echo "==================================================="
+          echo "To update the Homebrew formula:"
+          echo "==================================================="
+          echo ""
+          echo "1. Get the SHA256 checksums from the release:"
+          cat ./release/azkv-${{ steps.version.outputs.VERSION }}-osx-arm64.tar.gz.sha256
+          cat ./release/azkv-${{ steps.version.outputs.VERSION }}-osx-x64.tar.gz.sha256
+          echo ""
+          echo "2. Update the formula in musukvl/homebrew-azkv repository"
+          echo "   - Update version to: ${{ steps.version.outputs.VERSION }}"
+          echo "   - Update SHA256 checksums for both arm64 and x64"
+          echo "   - Update URLs to point to this release"
+          echo ""
+          echo "See: https://github.com/musukvl/homebrew-azkv"
+          echo "==================================================="

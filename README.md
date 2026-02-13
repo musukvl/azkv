@@ -1,5 +1,8 @@
 # Azure Key Vault Manager - Terminal UI
 
+[![Release](https://img.shields.io/github/v/release/musukvl/azkv)](https://github.com/musukvl/azkv/releases)
+[![License](https://img.shields.io/github/license/musukvl/azkv)](LICENSE)
+
 A terminal-based user interface application for managing Azure Key Vaults, built with [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui).
 
 ## Overview
@@ -23,28 +26,84 @@ This application provides a cross-platform terminal UI for comprehensive Azure K
 
 ## Prerequisites
 
-- .NET 10.0 SDK or later
 - Azure CLI (`az`) installed and configured
 - Active Azure subscription with Key Vaults
+- Run `az login` before using the application
 
-## Building
+## Installation
 
-From the project root:
+### macOS (Homebrew) - Recommended
 
 ```bash
-dotnet build
+# Add the tap
+brew tap musukvl/azkv
+
+# Install the application
+brew install azkv
+
+# Run the application
+azkv --help
 ```
 
+Or install in one command:
 ```bash
-dotnet build
+brew install musukvl/azkv/azkv
 ```
 
-## Running
+### Pre-built Binaries
 
-From the project root:
+Download the latest release for your platform from the [releases page](https://github.com/musukvl/azkv/releases):
+
+- **macOS Apple Silicon**: `azkv-*-osx-arm64.tar.gz`
+- **macOS Intel**: `azkv-*-osx-x64.tar.gz`
+- **Linux x64**: `azkv-*-linux-x64.tar.gz`
+- **Linux ARM64**: `azkv-*-linux-arm64.tar.gz`
+- **Windows x64**: `azkv-*-win-x64.zip`
+- **Windows ARM64**: `azkv-*-win-arm64.zip`
+
+#### macOS/Linux Installation
 
 ```bash
+# Extract the archive
+tar -xzf azkv-*-osx-arm64.tar.gz
+
+# Make executable
+chmod +x azkv
+
+# Move to PATH (optional)
+sudo mv azkv /usr/local/bin/
+
+# Run
+azkv --help
+```
+
+#### Windows Installation
+
+```powershell
+# Extract the zip file
+Expand-Archive azkv-*-win-x64.zip
+
+# Add to PATH or run directly
+.\azkv.exe --help
+```
+
+### Build from Source
+
+Requires .NET 10.0 SDK or later.
+
+```bash
+# Clone the repository
+git clone https://github.com/musukvl/azkv.git
+cd azkv
+
+# Build
+dotnet build
+
+# Run
 dotnet run --project src/AzureKvManager.Tui
+
+# Or use the build script (macOS)
+./build.sh
 ```
 
 ## Usage
@@ -85,33 +144,32 @@ The application is divided into four main panels:
 ```
 .
 ├── src/
-│   ├── tgui/
-│   │   └── AzureKvManager.Tui/        # Terminal UI application
-│   └── avalonia/
-│       └── AzureKvManager.Core/       # Shared core library
-├── AzureKvManager.sln                 # Solution file
-└── requirements.md                    # Project requirements
+│   └── AzureKvManager.Tui/            # Terminal UI application
+│       ├── Models/                    # Domain models
+│       ├── Services/                  # Azure CLI integration
+│       └── Views/                     # UI components
+├── homebrew/                          # Homebrew formula template
+├── .github/workflows/                 # GitHub Actions for releases
+├── build.sh                          # Build script for local development
+└── README.md
 ```
 
 ## Architecture
 
 ### Core Components
 
-- **AzureKvManager.Core** - Shared library providing:
-  - Data models (KeyVault, Secret, SecretVersion)
-  - Azure CLI service integration
-  - Business logic for all UI implementations
+- **Models** - Domain models (KeyVault, Secret, SecretVersion)
+- **Services** - Azure CLI service integration and business logic
+- **Views** - Terminal.Gui UI components and main window
 
-- **AzureKvManager.Tui** - Terminal UI application:
-  - Terminal.Gui based interface
-  - Real-time filtering and search
-  - Dialog-based create/edit operations
-  - Clipboard integration
+The application uses Azure CLI (`az`) under the hood for all Azure operations, ensuring consistent authentication and authorization with your existing Azure access.
 
 ## Dependencies
 
 - **Terminal.Gui** 2.0+ - Cross-platform Terminal UI toolkit
-- **.NET 10.0** - Runtime and sdk
+- **Spectre.Console** 0.54+ - Console output formatting
+- **.NET 10.0** - Runtime and SDK
+- **Azure CLI** - Required for Azure operations
 
 ## Development
 
@@ -121,85 +179,41 @@ The project follows .NET 10 best practices with:
 - Clean separation of concerns
 - Terminal.Gui best practices for responsive UI
 
+### Local Development Build
+
+```bash
+# Build the project
+dotnet build
+
+# Run directly
+dotnet run --project src/AzureKvManager.Tui
+
+# Or use the build script (macOS)
+./build.sh
+```
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues or pull requests.
+
+## Creating Releases
+
+Releases are automated via GitHub Actions:
+
+1. Update version in `src/AzureKvManager.Tui/AzureKvManager.Tui.csproj`
+2. Commit and push changes
+3. Create and push a git tag:
+   ```bash
+   git tag v1.0.0
+   git push origin v1.0.0
+   ```
+4. GitHub Actions will automatically:
+   - Build binaries for all platforms
+   - Create a GitHub release
+   - Upload all artifacts
+
+See [homebrew/README.md](homebrew/README.md) for instructions on updating the Homebrew formula.
+
 ## License
 
 See the project for licensing information.
-
-- Azure CLI installed and configured
-- Active Azure session: `az login`
-- Access to Azure Key Vaults
-
-## Architecture
-
-```
-azure-kv-viewer/
-├── src/
-│   ├── AzureKvManager.Core/          # Shared library
-│   │   ├── Models/                   # Domain models
-│   │   └── Services/                 # Azure CLI integration
-│   ├── Avalonia/                     # GUI solution folder
-│   │   ├── AzureKvManager.Avalonia/
-│   │   ├── AzureKvManager.Avalonia.Tests/
-│   │   └── AzureKvManager.Avalonia.sln
-│   └── Spectre/                      # CLI solution folder
-│       ├── AzureKvManager.Spectre/
-│       └── AzureKvManager.Spectre.sln
-└── README.md
-```
-
-## Development
-
-### Building All Projects
-
-```bash
-# Build Core library
-cd src/AzureKvManager.Core
-dotnet build
-
-# Build Avalonia solution
-cd ../Avalonia
-dotnet build
-
-# Build Spectre solution
-cd ../Spectre
-dotnet build
-```
-
-### Running Tests
-
-```bash
-cd src/Avalonia
-dotnet test
-```
-
-## Authentication
-
-Both applications use the current Azure CLI session for authentication. Make sure you're logged in:
-
-```bash
-az login
-az account show  # Verify current subscription
-```
-
-## Usage
-
-### GUI Application
-1. Launch the application
-2. The app will automatically load all key vaults you have access to via Azure CLI
-3. Double-click a key vault to view its secrets
-4. Double-click a secret to view its versions
-5. Click "Show Value" to display a specific version's value
-6. Click "Add New Version" to create a new version of a secret
-
-### CLI Application
-1. Launch the CLI
-2. Select from the interactive menu:
-   - List all Key Vaults
-   - Browse secrets in a Key Vault
-   - Add/Update a secret
-   - Search for a secret across all vaults
-3. Follow the prompts to navigate and manage secrets
-
-## Requirements
-
-See [requirements.md](requirements.md) for the full feature specification.
