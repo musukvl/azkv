@@ -8,6 +8,15 @@ This application provides a cross-platform terminal UI for comprehensive Azure K
 
 ![Screenshot](doc/screen.png)
 
+## Installation
+
+### Homebrew (macOS/Linux)
+
+```bash
+brew tap musukvl/azkv
+brew install azkv
+```
+
 ## Features
 
 - 📋 List all Azure Key Vaults in your subscription
