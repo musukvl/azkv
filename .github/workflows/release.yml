@@ -39,21 +39,11 @@ jobs:
             rid: linux-x64
             runner: ubuntu-latest
             archive: tar.gz
-          - os: linux
-            arch: arm64
-            rid: linux-arm64
-            runner: ubuntu-latest
-            archive: tar.gz
           
           # Windows builds
           - os: windows
             arch: x64
             rid: win-x64
-            runner: windows-latest
-            archive: zip
-          - os: windows
-            arch: arm64
-            rid: win-arm64
             runner: windows-latest
             archive: zip
 
