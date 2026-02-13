@@ -1,9 +1,8 @@
 name: Release
 
+# Disabled: Build on local machine due to GitHub Actions runner queue times
+# Use release.sh script instead
 on:
-  push:
-    tags:
-      - 'v*.*.*'
   workflow_dispatch:
     inputs:
       version:
