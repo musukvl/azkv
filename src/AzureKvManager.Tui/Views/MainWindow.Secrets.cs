@@ -1,4 +1,7 @@
 using Terminal.Gui;
+using Terminal.Gui.App;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
 using System.Collections.ObjectModel;
 
@@ -37,12 +40,12 @@ public partial class MainWindow
         }
     }
 
-    private async void OnSecretSelected(object? sender, ListViewItemEventArgs args)
+    private async void OnSecretSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
     {
-        if (args.Item < 0 || args.Item >= _filteredSecrets.Count || _selectedKeyVault == null)
+        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _filteredSecrets.Count || _selectedKeyVault == null)
             return;
         
-        _selectedSecret = _filteredSecrets[args.Item];
+        _selectedSecret = _filteredSecrets[args.NewValue.Value];
         _versions.Clear();
         
         Application.Invoke(() =>
@@ -80,7 +83,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to load versions: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load versions: {ex.Message}", "OK");
             });
         }
     }
@@ -89,7 +92,7 @@ public partial class MainWindow
     {
         if (_selectedKeyVault == null)
         {
-            MessageBox.ErrorQuery("Error", "Please select a Key Vault first", "OK");
+            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a Key Vault first", "OK");
             return;
         }
 
@@ -159,13 +162,13 @@ public partial class MainWindow
 
             if (string.IsNullOrWhiteSpace(name))
             {
-                MessageBox.ErrorQuery("Error", "Secret name is required", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret name is required", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(value))
             {
-                MessageBox.ErrorQuery("Error", "Secret value is required", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret value is required", "OK");
                 return;
             }
 
@@ -205,7 +208,7 @@ public partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _statusLabel.Text = $"Secret '{name}' created successfully";
-                    MessageBox.Query("Success", $"Secret '{name}' has been created successfully!", "OK");
+                    MessageBox.Query(Application.Instance, "Success", $"Secret '{name}' has been created successfully!", "OK");
                 });
 
                 // Refresh the secrets list
@@ -216,7 +219,7 @@ public partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _statusLabel.Text = $"Failed to create secret '{name}'";
-                    MessageBox.ErrorQuery("Error", $"Failed to create secret '{name}'", "OK");
+                    MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret '{name}'", "OK");
                 });
             }
         }
@@ -225,7 +228,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to create secret: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret: {ex.Message}", "OK");
             });
         }
     }
@@ -264,7 +267,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to refresh secrets: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to refresh secrets: {ex.Message}", "OK");
             });
         }
     }

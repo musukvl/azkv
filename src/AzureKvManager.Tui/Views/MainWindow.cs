@@ -1,4 +1,8 @@
 using Terminal.Gui;
+using Terminal.Gui.App;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
 using AzureKvManager.Tui.Models;
 using System.Collections.ObjectModel;
@@ -83,11 +87,10 @@ public partial class MainWindow : Window
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            AllowsMarking = false
+            Height = Dim.Fill()
         };
         
-        _keyVaultsList.OpenSelectedItem += OnKeyVaultSelected;
+        _keyVaultsList.ValueChanged += OnKeyVaultSelectionChanged;
         keyVaultsFrame.Add(_keyVaultFilter, kvFilterLabel, _keyVaultsList);
         
         var secretsFrame = new FrameView
@@ -121,11 +124,10 @@ public partial class MainWindow : Window
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(1),
-            AllowsMarking = false
+            Height = Dim.Fill(1)
         };
         
-        _secretsList.OpenSelectedItem += OnSecretSelected;
+        _secretsList.ValueChanged += OnSecretSelectionChanged;
         
         var addSecretButton = new Button
         {
@@ -151,11 +153,10 @@ public partial class MainWindow : Window
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(4),
-            AllowsMarking = false
+            Height = Dim.Fill(4)
         };
         
-        _versionsList.OpenSelectedItem += OnVersionSelected;
+        _versionsList.ValueChanged += OnVersionSelectionChanged;
         
         var addVersionButton = new Button
         {
@@ -233,14 +234,14 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrEmpty(_valueView.Text?.ToString()))
         {
-            Clipboard.Contents = _valueView.Text;
+            Application.Clipboard.SetClipboardData(_valueView.Text.ToString()!);
             _statusLabel.Text = "Secret value copied to clipboard!";
         }
     }
 
     private void ShowAbout()
     {
-        MessageBox.Query("About", 
+        MessageBox.Query(Application.Instance, "About", 
             "Azure Key Vault Manager (TUI)\n\n" +
             "A Terminal UI application for managing Azure Key Vaults\n" +
             "Built with Terminal.Gui\n\n" +

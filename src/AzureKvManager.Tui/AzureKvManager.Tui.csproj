@@ -20,7 +20,7 @@
 
   <ItemGroup>
     <PackageReference Include="Spectre.Console" Version="0.54.0" />
-    <PackageReference Include="Terminal.Gui" Version="2.0.0" />
+    <PackageReference Include="Terminal.Gui" Version="2.0.0-develop.5100" />
   </ItemGroup>
 
 </Project>

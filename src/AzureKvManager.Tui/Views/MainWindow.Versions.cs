@@ -1,17 +1,20 @@
 using Terminal.Gui;
+using Terminal.Gui.App;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
 using System.Collections.ObjectModel;
 
 namespace AzureKvManager.Tui.Views;
 
 public partial class MainWindow
 {
-    private async void OnVersionSelected(object? sender, ListViewItemEventArgs args)
+    private async void OnVersionSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
     {
-        if (args.Item < 0 || args.Item >= _versions.Count || 
+        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _versions.Count || 
             _selectedKeyVault == null || _selectedSecret == null)
             return;
         
-        var version = _versions[args.Item];
+        var version = _versions[args.NewValue.Value];
         
         Application.Invoke(() =>
         {
@@ -39,7 +42,7 @@ public partial class MainWindow
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
                 _valueView.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to load secret value: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load secret value: {ex.Message}", "OK");
             });
         }
     }
@@ -48,13 +51,13 @@ public partial class MainWindow
     {
         if (_selectedKeyVault == null)
         {
-            MessageBox.ErrorQuery("Error", "Please select a Key Vault first", "OK");
+            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a Key Vault first", "OK");
             return;
         }
 
         if (_selectedSecret == null)
         {
-            MessageBox.ErrorQuery("Error", "Please select a secret first", "OK");
+            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a secret first", "OK");
             return;
         }
 
@@ -109,7 +112,7 @@ public partial class MainWindow
 
             if (string.IsNullOrWhiteSpace(value))
             {
-                MessageBox.ErrorQuery("Error", "Secret value is required", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret value is required", "OK");
                 return;
             }
 
@@ -149,7 +152,7 @@ public partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _statusLabel.Text = $"New version created for '{_selectedSecret.Name}'";
-                    MessageBox.Query("Success", $"New version of '{_selectedSecret.Name}' has been created successfully!", "OK");
+                    MessageBox.Query(Application.Instance, "Success", $"New version of '{_selectedSecret.Name}' has been created successfully!", "OK");
                 });
 
                 // Refresh the versions list
@@ -160,7 +163,7 @@ public partial class MainWindow
                 Application.Invoke(() =>
                 {
                     _statusLabel.Text = $"Failed to create new version for '{_selectedSecret.Name}'";
-                    MessageBox.ErrorQuery("Error", $"Failed to create new version for '{_selectedSecret.Name}'", "OK");
+                    MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create new version for '{_selectedSecret.Name}'", "OK");
                 });
             }
         }
@@ -169,7 +172,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to create secret version: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret version: {ex.Message}", "OK");
             });
         }
     }
@@ -207,7 +210,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to refresh versions: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to refresh versions: {ex.Message}", "OK");
             });
         }
     }

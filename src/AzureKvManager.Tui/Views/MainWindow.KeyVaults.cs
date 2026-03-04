@@ -1,4 +1,6 @@
 using Terminal.Gui;
+using Terminal.Gui.App;
+using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
 using System.Collections.ObjectModel;
 
@@ -37,7 +39,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
             });
         }
     }
@@ -67,12 +69,12 @@ public partial class MainWindow
             : $"No matches found (total: {_keyVaults.Count})";
     }
 
-    private async void OnKeyVaultSelected(object? sender, ListViewItemEventArgs args)
+    private async void OnKeyVaultSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
     {
-        if (args.Item < 0 || args.Item >= _filteredKeyVaults.Count)
+        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _filteredKeyVaults.Count)
             return;
         
-        _selectedKeyVault = _filteredKeyVaults[args.Item];
+        _selectedKeyVault = _filteredKeyVaults[args.NewValue.Value];
         _selectedSecret = null;
         _secrets.Clear();
         _filteredSecrets.Clear();
@@ -115,7 +117,7 @@ public partial class MainWindow
             Application.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery("Error", $"Failed to load secrets: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load secrets: {ex.Message}", "OK");
             });
         }
     }
