@@ -31,12 +31,14 @@ Table should be orderable by all columns.
 - On the list should be button to show the value of the secret version.
 - On the top should be add new version button to open add new version form.
 - Should support copying secret values to clipboard and from clipboard.
+- Should display expiration date and content type of the secret version if they are set.
 
 ## New secret form
 - Should have fields for secret name, secret value, and optional description.
 - Should have save button to save the secret.
 - Should validate that name and value are not empty.
 - Should automatically refresh the secrets list after creation.
+- Should support expiration date set.
 
 ## New version form
 - Should have fields for secret value and description.
