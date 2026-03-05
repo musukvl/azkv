@@ -28,10 +28,11 @@ Table should be orderable by all columns.
   
 ## Secret versions page
 - Should list all versions of the secret in the table.
-- On the list should be button to show the value of the secret version.
+- When user selects a version, the secret value should be displayed in the secret value pane.
 - On the top should be add new version button to open add new version form.
 - Should support copying secret values to clipboard and from clipboard.
-- Should display expiration date and content type of the secret version if they are set.
+- Should display selected version expiration date and content type in separate fields (not inside one version list row).
+- Content type field should allow reading long values (multiline, wrapped, read-only display).
 
 ## New secret form
 - Should have fields for secret name, secret value, and optional description.
