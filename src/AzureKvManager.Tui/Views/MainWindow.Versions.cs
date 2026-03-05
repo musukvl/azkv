@@ -65,7 +65,7 @@ public partial class MainWindow
         {
             Title = $"Add New Version to '{_selectedSecret.Name}'",
             Width = Dim.Percent(60),
-            Height = 10
+            Height = 12
         };
 
         var valueLabel = new Label
@@ -97,6 +97,20 @@ public partial class MainWindow
             Width = Dim.Fill(1)
         };
 
+        var expirationDateLabel = new Label
+        {
+            Text = "Expiration Date (yyyy-MM-dd, optional):",
+            X = 1,
+            Y = 7
+        };
+
+        var expirationDateField = new TextField
+        {
+            X = 1,
+            Y = 8,
+            Width = Dim.Fill(1)
+        };
+
         var okButton = new Button
         {
             Text = "OK",
@@ -109,6 +123,7 @@ public partial class MainWindow
         {
             var value = valueField.Text?.ToString()?.Trim();
             var contentType = contentTypeField.Text?.ToString()?.Trim();
+            var expirationDateText = expirationDateField.Text?.ToString();
 
             if (string.IsNullOrWhiteSpace(value))
             {
@@ -116,8 +131,14 @@ public partial class MainWindow
                 return;
             }
 
+            if (!TryParseExpirationDate(expirationDateText, out var expiresAt))
+            {
+                MessageBox.ErrorQuery(Application.Instance, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
+                return;
+            }
+
             dialog.RequestStop();
-            await CreateSecretVersion(value, contentType);
+            await CreateSecretVersion(value, contentType, expiresAt);
         };
 
         var cancelButton = new Button
@@ -129,11 +150,11 @@ public partial class MainWindow
 
         cancelButton.Accepting += (s, e) => dialog.RequestStop();
 
-        dialog.Add(valueLabel, valueField, contentTypeLabel, contentTypeField, okButton, cancelButton);
+        dialog.Add(valueLabel, valueField, contentTypeLabel, contentTypeField, expirationDateLabel, expirationDateField, okButton, cancelButton);
         Application.Run(dialog);
     }
 
-    private async Task CreateSecretVersion(string value, string? contentType)
+    private async Task CreateSecretVersion(string value, string? contentType, DateTime? expiresAt)
     {
         if (_selectedKeyVault == null || _selectedSecret == null)
             return;
@@ -145,7 +166,7 @@ public partial class MainWindow
 
         try
         {
-            var success = await _azureService.SetSecretAsync(_selectedKeyVault.Name, _selectedSecret.Name, value, contentType);
+            var success = await _azureService.SetSecretAsync(_selectedKeyVault.Name, _selectedSecret.Name, value, contentType, expiresAt);
 
             if (success)
             {
@@ -190,12 +211,7 @@ public partial class MainWindow
             {
                 if (_versions.Any())
                 {
-                    _versionsList.SetSource(new ObservableCollection<string>(_versions.Select(v =>
-                    {
-                        var status = v.Enabled ? "✓" : "✗";
-                        var updated = v.Updated?.ToString("yyyy-MM-dd HH:mm") ?? "N/A";
-                        return $"{status} {v.Version.Substring(0, Math.Min(8, v.Version.Length))}... ({updated})";
-                    })));
+                    _versionsList.SetSource(new ObservableCollection<string>(_versions.Select(FormatVersionDisplay)));
                     _statusLabel.Text = $"Loaded {_versions.Count} version(s) for {_selectedSecret.Name}";
                 }
                 else

@@ -86,6 +86,7 @@ public class AzureCliService
                 Enabled = v.Attributes?.Enabled ?? false,
                 Created = v.Attributes?.Created,
                 Updated = v.Attributes?.Updated,
+                Expires = v.Attributes?.Expires,
                 ContentType = v.ContentType
             }).ToList() ?? [];
         }
@@ -116,12 +117,22 @@ public class AzureCliService
         }
     }
 
-    public async Task<bool> SetSecretAsync(string keyVaultName, string secretName, string value, string? contentType = null)
+    public async Task<bool> SetSecretAsync(string keyVaultName, string secretName, string value, string? contentType = null, DateTime? expires = null)
     {
         var contentTypeParam = string.IsNullOrWhiteSpace(contentType) ? "" : $" --content-type \"{contentType}\"";
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret set --vault-name {keyVaultName} --name {secretName} --value \"{value}\"{contentTypeParam}");
+        var expiresParam = expires.HasValue ? $" --expires \"{FormatAzUtcDateTime(expires.Value)}\"" : "";
+        var result = await ExecuteAzCliCommandAsync($"az keyvault secret set --vault-name {keyVaultName} --name {secretName} --value \"{value}\"{contentTypeParam}{expiresParam}");
         
         return !string.IsNullOrWhiteSpace(result);
+    }
+
+    private static string FormatAzUtcDateTime(DateTime dateTime)
+    {
+        var utc = dateTime.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(dateTime, DateTimeKind.Utc)
+            : dateTime.ToUniversalTime();
+
+        return utc.ToString("yyyy-MM-ddTHH:mm:ssZ");
     }
 
     private async Task<string> ExecuteAzCliCommandAsync(string command)
@@ -215,5 +226,6 @@ public class AzureCliService
         public bool Enabled { get; set; }
         public DateTime? Created { get; set; }
         public DateTime? Updated { get; set; }
+        public DateTime? Expires { get; set; }
     }
 }

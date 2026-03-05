@@ -6,6 +6,7 @@ using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
 using AzureKvManager.Tui.Models;
 using System.Collections.ObjectModel;
+using System.Globalization;
 
 namespace AzureKvManager.Tui.Views;
 
@@ -253,5 +254,59 @@ public partial class MainWindow : Window
             "- Ctrl+C / Alt+C: Copy secret value\n" +
             "- Ctrl+Q / Alt+F4: Quit", 
             "OK");
+    }
+
+    private string FormatVersionDisplay(SecretVersion version)
+    {
+        var status = version.Enabled ? "✓" : "✗";
+        var updated = version.Updated?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "N/A";
+        var shortVersion = version.Version.Substring(0, Math.Min(8, version.Version.Length));
+        var contentTypePart = string.IsNullOrWhiteSpace(version.ContentType) ? string.Empty : $" [{version.ContentType}]";
+
+        var expiresPart = string.Empty;
+        var warningPrefix = string.Empty;
+
+        if (version.Expires.HasValue)
+        {
+            expiresPart = $" [exp: {version.Expires.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}]";
+            if (IsExpired(version.Expires.Value))
+            {
+                warningPrefix = "⚠ ";
+            }
+        }
+
+        return $"{warningPrefix}{status} {shortVersion}... ({updated}){expiresPart}{contentTypePart}";
+    }
+
+    private static bool IsExpired(DateTime expiresAt)
+    {
+        var expiresUtc = expiresAt.Kind == DateTimeKind.Unspecified
+            ? DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc)
+            : expiresAt.ToUniversalTime();
+
+        return expiresUtc < DateTime.UtcNow;
+    }
+
+    private static bool TryParseExpirationDate(string? input, out DateTime? expiresAt)
+    {
+        expiresAt = null;
+
+        if (string.IsNullOrWhiteSpace(input))
+        {
+            return true;
+        }
+
+        if (!DateTime.TryParseExact(
+                input.Trim(),
+                "yyyy-MM-dd",
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.None,
+                out var parsedDate))
+        {
+            return false;
+        }
+
+        expiresAt = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
+        return true;
     }
 }

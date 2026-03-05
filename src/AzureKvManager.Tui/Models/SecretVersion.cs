@@ -6,6 +6,7 @@ public class SecretVersion
     public bool Enabled { get; set; }
     public DateTime? Created { get; set; }
     public DateTime? Updated { get; set; }
+    public DateTime? Expires { get; set; }
     public string? ContentType { get; set; }
     public string? Value { get; set; }
 }
