@@ -17,7 +17,10 @@ public partial class MainWindow : Window
     private TextField _secretFilter;
     private ListView _keyVaultsList;
     private ListView _secretsList;
-    private ListView _versionsList;
+    private TableView _versionsTable;
+    private Button _copyButton;
+    private TextView _contentTypeView;
+    private Label _expirationLabel;
     private TextView _valueView;
     private Label _statusLabel;
     
@@ -29,6 +32,8 @@ public partial class MainWindow : Window
     private KeyVault? _selectedKeyVault;
     private Secret? _selectedSecret;
     private string? _initialFilter;
+    private bool _suppressVersionSelectionEvent;
+    private string? _selectedVersionId;
 
     public MainWindow(string? initialFilter = null)
     {
@@ -62,7 +67,7 @@ public partial class MainWindow : Window
             Title = "Key Vaults",
             X = 0,
             Y = 1,
-            Width = Dim.Percent(30),
+            Width = Dim.Percent(25),
             Height = Dim.Fill(2)
         };
         
@@ -99,7 +104,7 @@ public partial class MainWindow : Window
             Title = "Secrets",
             X = Pos.Right(keyVaultsFrame),
             Y = 1,
-            Width = Dim.Percent(50),
+            Width = Dim.Percent(40),
             Height = Dim.Fill(2)
         };
         
@@ -142,47 +147,109 @@ public partial class MainWindow : Window
         
         var versionsFrame = new FrameView
         {
-            Title = "Secret Details",
+            Title = "Secret Versions",
             X = Pos.Right(secretsFrame),
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Percent(40)
+            Height = Dim.Percent(35)
         };
         
-        _versionsList = new ListView
+        _versionsTable = new TableView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill(4)
+            Height = Dim.Fill()
         };
+
+        _versionsTable.FullRowSelect = true;
+        _versionsTable.MultiSelect = false;
+        _versionsTable.Style.ShowVerticalCellLines = false;
+        _versionsTable.Style.ShowVerticalHeaderLines = false;
+        _versionsTable.Style.ExpandLastColumn = true;
+
+        SetVersionsTableSource(_versions);
         
-        _versionsList.ValueChanged += OnVersionSelectionChanged;
+        _versionsTable.SelectedCellChanged += OnVersionSelectionChanged;
+
+        versionsFrame.Add(_versionsTable);
+
+        var actionsFrame = new FrameView
+        {
+            Title = "Actions",
+            X = Pos.Right(secretsFrame),
+            Y = Pos.Bottom(versionsFrame),
+            Width = Dim.Fill(),
+            Height = 3
+        };
         
         var addVersionButton = new Button
         {
             Text = "New _Version",
             X = 0,
-            Y = Pos.Bottom(_versionsList)
+            Y = 0
         };
         addVersionButton.Accepting += (s, e) => ShowAddVersionDialog();
         
-        var copyButton = new Button
+        _copyButton = new Button
         {
             Text = "Copy _Value",
             X = Pos.Right(addVersionButton) + 1,
-            Y = Pos.Bottom(_versionsList),
+            Y = 0,
             Enabled = false
         };
-        copyButton.Accepting += (s, e) => CopySecretValue();
-        
-        versionsFrame.Add(_versionsList, addVersionButton, copyButton);
+        _copyButton.Accepting += (s, e) => CopySecretValue();
+
+        actionsFrame.Add(addVersionButton, _copyButton);
+
+        var contentTypeFrame = new FrameView
+        {
+            Title = "Content Type",
+            X = Pos.Right(secretsFrame),
+            Y = Pos.Bottom(actionsFrame),
+            Width = Dim.Fill(),
+            Height = Dim.Percent(15)
+        };
+
+        _contentTypeView = new TextView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            ReadOnly = true,
+            WordWrap = true,
+            SchemeName = "Base"
+        };
+
+        ApplyReadableTextScheme(_contentTypeView);
+
+        contentTypeFrame.Add(_contentTypeView);
+
+        var expirationFrame = new FrameView
+        {
+            Title = "Expiration Date",
+            X = Pos.Right(secretsFrame),
+            Y = Pos.Bottom(contentTypeFrame),
+            Width = Dim.Fill(),
+            Height = 3
+        };
+
+        _expirationLabel = new Label
+        {
+            Text = "Expiration: (select a version)",
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill()
+        };
+
+        expirationFrame.Add(_expirationLabel);
         
         var valueFrame = new FrameView
         {
             Title = "Secret Value",
             X = Pos.Right(secretsFrame),
-            Y = Pos.Bottom(versionsFrame),
+            Y = Pos.Bottom(expirationFrame),
             Width = Dim.Fill(),
             Height = Dim.Fill(2)
         };
@@ -194,8 +261,11 @@ public partial class MainWindow : Window
             Width = Dim.Fill(),
             Height = Dim.Fill(),
             ReadOnly = true,
-            WordWrap = true
+            WordWrap = true,
+            SchemeName = "Base"
         };
+
+        ApplyReadableTextScheme(_valueView);
         
         _valueView.KeyDown += (s, e) =>
         {
@@ -210,6 +280,8 @@ public partial class MainWindow : Window
         };
         
         valueFrame.Add(_valueView);
+
+        ClearVersionSelectionDetails();
         
         _statusLabel = new Label
         {
@@ -219,7 +291,7 @@ public partial class MainWindow : Window
             Width = Dim.Fill()
         };
         
-        Add(keyVaultsFrame, secretsFrame, versionsFrame, valueFrame, _statusLabel);
+        Add(keyVaultsFrame, secretsFrame, versionsFrame, actionsFrame, contentTypeFrame, expirationFrame, valueFrame, _statusLabel);
         
         // Apply initial filter if provided
         if (!string.IsNullOrEmpty(_initialFilter))
@@ -256,26 +328,89 @@ public partial class MainWindow : Window
             "OK");
     }
 
-    private string FormatVersionDisplay(SecretVersion version)
+    private void SetVersionsTableSource(IEnumerable<SecretVersion> versions)
     {
-        var status = version.Enabled ? "✓" : "✗";
-        var updated = version.Updated?.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) ?? "N/A";
-        var shortVersion = version.Version.Substring(0, Math.Min(8, version.Version.Length));
-        var contentTypePart = string.IsNullOrWhiteSpace(version.ContentType) ? string.Empty : $" [{version.ContentType}]";
+        var snapshot = versions.ToArray();
 
-        var expiresPart = string.Empty;
-        var warningPrefix = string.Empty;
-
-        if (version.Expires.HasValue)
-        {
-            expiresPart = $" [exp: {version.Expires.Value.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)}]";
-            if (IsExpired(version.Expires.Value))
+        _versionsTable.Table = new EnumerableTableSource<SecretVersion>(
+            snapshot,
+            new Dictionary<string, Func<SecretVersion, object>>
             {
-                warningPrefix = "⚠ ";
+                ["Version"] = version => ShortVersion(version.Version),
+                ["Created"] = version => FormatVersionDate(version.Created),
+                ["Expires"] = version => FormatVersionDate(version.Expires)
             }
+        );
+
+        _versionsTable.Update();
+    }
+
+    private static string ShortVersion(string version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+        {
+            return "-";
         }
 
-        return $"{warningPrefix}{status} {shortVersion}... ({updated}){expiresPart}{contentTypePart}";
+        return version.Substring(0, Math.Min(8, version.Length));
+    }
+
+    private static string FormatVersionDate(DateTime? dateTime)
+    {
+        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
+    }
+
+    private static string FormatVersionDateTime(DateTime dateTime)
+    {
+        return dateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
+    }
+
+    private static DateTime GetVersionSortKey(SecretVersion version)
+    {
+        return version.Created ?? version.Updated ?? DateTime.MinValue;
+    }
+
+    private static void ApplyReadableTextScheme(TextView textView)
+    {
+        var currentScheme = textView.GetScheme();
+
+        if (currentScheme is null)
+        {
+            return;
+        }
+
+        textView.SetScheme(new Terminal.Gui.Drawing.Scheme(currentScheme)
+        {
+            Editable = currentScheme.Normal,
+            ReadOnly = currentScheme.Normal
+        });
+    }
+
+    private string BuildExpirationDetailsText(DateTime? expiresAt)
+    {
+        if (!expiresAt.HasValue)
+        {
+            return "Expiration: (not set)";
+        }
+
+        var formatted = FormatVersionDateTime(expiresAt.Value);
+        return IsExpired(expiresAt.Value)
+            ? $"Expiration: ⚠ EXPIRED ({formatted})"
+            : $"Expiration: {formatted}";
+    }
+
+    private void ClearVersionSelectionDetails(bool clearValue = true)
+    {
+        _selectedVersionId = null;
+        _contentTypeView.Text = string.Empty;
+        _expirationLabel.Text = "Expiration: (select a version)";
+
+        if (clearValue)
+        {
+            _valueView.Text = string.Empty;
+        }
+
+        _copyButton.Enabled = false;
     }
 
     private static bool IsExpired(DateTime expiresAt)

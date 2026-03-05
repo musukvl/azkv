@@ -2,46 +2,99 @@ using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
-using System.Collections.ObjectModel;
+using AzureKvManager.Tui.Models;
 
 namespace AzureKvManager.Tui.Views;
 
 public partial class MainWindow
 {
-    private async void OnVersionSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
+    private async void OnVersionSelectionChanged(object? sender, SelectedCellChangedEventArgs args)
     {
-        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _versions.Count || 
-            _selectedKeyVault == null || _selectedSecret == null)
+        if (_suppressVersionSelectionEvent)
+        {
             return;
+        }
+
+        if (args.NewRow < 0 || args.NewRow >= _versions.Count || 
+            _selectedKeyVault == null || _selectedSecret == null)
+        {
+            Application.Invoke(() => ClearVersionSelectionDetails());
+            return;
+        }
         
-        var version = _versions[args.NewValue.Value];
+        var version = _versions[args.NewRow];
+        await LoadVersionDetailsAsync(version);
+    }
+
+    private async Task LoadVersionDetailsAsync(SecretVersion version)
+    {
+        if (_selectedKeyVault == null || _selectedSecret == null)
+        {
+            return;
+        }
+
+        var selectedVaultName = _selectedKeyVault.Name;
+        var selectedSecretName = _selectedSecret.Name;
+        var selectedVersionId = version.Version;
         
         Application.Invoke(() =>
         {
+            _selectedVersionId = selectedVersionId;
             _statusLabel.Text = $"Loading secret value...";
+            _contentTypeView.Text = string.IsNullOrWhiteSpace(version.ContentType) ? "(none)" : version.ContentType;
+            _expirationLabel.Text = BuildExpirationDetailsText(version.Expires);
             _valueView.Text = "Loading...";
+            _copyButton.Enabled = false;
         });
         
         try
         {
-            var value = await _azureService.GetSecretValueAsync(
-                _selectedKeyVault.Name, 
-                _selectedSecret.Name, 
+            var details = await _azureService.GetSecretVersionDetailsAsync(
+                selectedVaultName,
+                selectedSecretName,
                 version.Version
             );
             
             Application.Invoke(() =>
             {
-                _valueView.Text = value ?? "(empty)";
-                _statusLabel.Text = $"Loaded value for {_selectedSecret.Name} (version {version.Version.Substring(0, 8)}...)";
+                if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
+                {
+                    return;
+                }
+
+                if (_selectedVersionId != selectedVersionId)
+                {
+                    return;
+                }
+
+                var resolvedContentType = details?.ContentType ?? version.ContentType;
+                var resolvedExpiration = details?.Expires ?? version.Expires;
+                var resolvedValue = details?.Value;
+
+                _contentTypeView.Text = string.IsNullOrWhiteSpace(resolvedContentType) ? "(none)" : resolvedContentType;
+                _expirationLabel.Text = BuildExpirationDetailsText(resolvedExpiration);
+                _valueView.Text = resolvedValue ?? "(empty)";
+                _copyButton.Enabled = !string.IsNullOrWhiteSpace(resolvedValue);
+                _statusLabel.Text = $"Loaded value for {selectedSecretName} (version {ShortVersion(version.Version)}...)";
             });
         }
         catch (Exception ex)
         {
             Application.Invoke(() =>
             {
+                if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
+                {
+                    return;
+                }
+
+                if (_selectedVersionId != selectedVersionId)
+                {
+                    return;
+                }
+
                 _statusLabel.Text = $"Error: {ex.Message}";
                 _valueView.Text = $"Error: {ex.Message}";
+                _copyButton.Enabled = false;
                 MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load secret value: {ex.Message}", "OK");
             });
         }
@@ -203,23 +256,44 @@ public partial class MainWindow
         if (_selectedKeyVault == null || _selectedSecret == null)
             return;
 
+        Application.Invoke(() =>
+        {
+            _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
+            SetVersionsTableSource([]);
+            ClearVersionSelectionDetails();
+        });
+
         try
         {
-            _versions = await _azureService.GetSecretVersionsAsync(_selectedKeyVault.Name, _selectedSecret.Name);
+            var versions = await _azureService.GetSecretVersionsAsync(_selectedKeyVault.Name, _selectedSecret.Name);
+            _versions = versions
+                .OrderByDescending(GetVersionSortKey)
+                .ThenByDescending(v => v.Version, StringComparer.Ordinal)
+                .ToList();
             
             Application.Invoke(() =>
             {
+                SetVersionsTableSource(_versions);
+
                 if (_versions.Any())
                 {
-                    _versionsList.SetSource(new ObservableCollection<string>(_versions.Select(FormatVersionDisplay)));
                     _statusLabel.Text = $"Loaded {_versions.Count} version(s) for {_selectedSecret.Name}";
+
+                    _suppressVersionSelectionEvent = true;
+                    _versionsTable.SelectedRow = 0;
+                    _versionsTable.EnsureSelectedCellIsVisible();
+                    _suppressVersionSelectionEvent = false;
                 }
                 else
                 {
-                    _versionsList.SetSource(new ObservableCollection<string> { "No versions found" });
                     _statusLabel.Text = $"No versions for {_selectedSecret.Name}";
                 }
             });
+
+            if (_versions.Any())
+            {
+                await LoadVersionDetailsAsync(_versions[0]);
+            }
         }
         catch (Exception ex)
         {

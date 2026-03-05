@@ -87,8 +87,8 @@ public partial class MainWindow
         {
             _statusLabel.Text = $"Loading secrets from {_selectedKeyVault.Name}...";
             _secretsList.SetSource(new ObservableCollection<string> { "Loading..." });
-            _versionsList.SetSource(new ObservableCollection<string>());
-            _valueView.Text = string.Empty;
+            SetVersionsTableSource([]);
+            ClearVersionSelectionDetails();
         });
         
         try

@@ -117,6 +117,40 @@ public class AzureCliService
         }
     }
 
+    public async Task<SecretVersion?> GetSecretVersionDetailsAsync(string keyVaultName, string secretName, string version)
+    {
+        var result = await ExecuteAzCliCommandAsync($"az keyvault secret show --vault-name {keyVaultName} --name {secretName} --version {version}");
+
+        if (string.IsNullOrWhiteSpace(result))
+            return null;
+
+        try
+        {
+            var secret = JsonSerializer.Deserialize<AzSecretWithValueDto>(result, _jsonOptions);
+
+            if (secret == null)
+            {
+                return null;
+            }
+
+            return new SecretVersion
+            {
+                Version = version,
+                Value = secret.Value,
+                ContentType = secret.ContentType,
+                Enabled = secret.Attributes?.Enabled ?? false,
+                Created = secret.Attributes?.Created,
+                Updated = secret.Attributes?.Updated,
+                Expires = secret.Attributes?.Expires
+            };
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting secret version details: {ex.Message}");
+            return null;
+        }
+    }
+
     public async Task<bool> SetSecretAsync(string keyVaultName, string secretName, string value, string? contentType = null, DateTime? expires = null)
     {
         var contentTypeParam = string.IsNullOrWhiteSpace(contentType) ? "" : $" --content-type \"{contentType}\"";
@@ -219,6 +253,7 @@ public class AzureCliService
     {
         public string? Value { get; set; }
         public string? ContentType { get; set; }
+        public AzAttributesDto? Attributes { get; set; }
     }
 
     private class AzAttributesDto

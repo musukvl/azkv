@@ -51,36 +51,11 @@ public partial class MainWindow
         Application.Invoke(() =>
         {
             _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
-            _versionsList.SetSource(new ObservableCollection<string> { "Loading..." });
-            _valueView.Text = string.Empty;
+            SetVersionsTableSource([]);
+            ClearVersionSelectionDetails();
         });
-        
-        try
-        {
-            _versions = await _azureService.GetSecretVersionsAsync(_selectedKeyVault.Name, _selectedSecret.Name);
-            
-            Application.Invoke(() =>
-            {
-                if (_versions.Any())
-                {
-                    _versionsList.SetSource(new ObservableCollection<string>(_versions.Select(FormatVersionDisplay)));
-                    _statusLabel.Text = $"Loaded {_versions.Count} version(s) for {_selectedSecret.Name}";
-                }
-                else
-                {
-                    _versionsList.SetSource(new ObservableCollection<string> { "No versions found" });
-                    _statusLabel.Text = $"No versions for {_selectedSecret.Name}";
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            Application.Invoke(() =>
-            {
-                _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load versions: {ex.Message}", "OK");
-            });
-        }
+
+        await RefreshVersionsForSelectedSecret();
     }
 
     private void ShowAddSecretDialog()
