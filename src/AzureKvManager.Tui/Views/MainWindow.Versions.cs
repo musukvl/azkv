@@ -279,9 +279,9 @@ public partial class MainWindow
                 {
                     _statusLabel.Text = $"Loaded {_versions.Count} version(s) for {_selectedSecret.Name}";
 
+                    // Do not auto-select any version. Load details only when user selects one.
                     _suppressVersionSelectionEvent = true;
-                    _versionsTable.SelectedRow = 0;
-                    _versionsTable.EnsureSelectedCellIsVisible();
+                    _versionsTable.SelectedRow = -1;
                     _suppressVersionSelectionEvent = false;
                 }
                 else
@@ -289,11 +289,6 @@ public partial class MainWindow
                     _statusLabel.Text = $"No versions for {_selectedSecret.Name}";
                 }
             });
-
-            if (_versions.Any())
-            {
-                await LoadVersionDetailsAsync(_versions[0]);
-            }
         }
         catch (Exception ex)
         {

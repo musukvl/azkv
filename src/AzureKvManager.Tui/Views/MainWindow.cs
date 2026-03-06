@@ -17,7 +17,7 @@ public partial class MainWindow : Window
     private TextField _keyVaultFilter;
     private TextField _secretFilter;
     private ListView _keyVaultsList;
-    private ListView _secretsList;
+    private TableView _secretsTable;
     private TableView _versionsTable;
     private Button _copyButton;
     private TextView _contentTypeView;
@@ -127,25 +127,32 @@ public partial class MainWindow : Window
         };
         _secretFilter.TextChanged += (s, e) => FilterSecrets();
         
-        _secretsList = new ListView
+        _secretsTable = new TableView
         {
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(1)
         };
-        
-        _secretsList.ValueChanged += OnSecretSelectionChanged;
+
+        _secretsTable.FullRowSelect = true;
+        _secretsTable.MultiSelect = false;
+        _secretsTable.Style.ShowVerticalCellLines = false;
+        _secretsTable.Style.ShowVerticalHeaderLines = false;
+        _secretsTable.Style.ExpandLastColumn = true;
+
+        SetSecretsTableSource([]);
+        _secretsTable.SelectedCellChanged += OnSecretSelectionChanged;
         
         var addSecretButton = new Button
         {
             Text = "New _Secret",
             X = 0,
-            Y = Pos.Bottom(_secretsList)
+            Y = Pos.Bottom(_secretsTable)
         };
         addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
         
-        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsList, addSecretButton);
+        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsTable, addSecretButton);
         
         var versionsFrame = new FrameView
         {

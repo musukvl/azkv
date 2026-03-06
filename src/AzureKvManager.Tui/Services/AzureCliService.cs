@@ -58,6 +58,7 @@ public class AzureCliService
                 Name = s.Name ?? string.Empty,
                 ContentType = s.ContentType,
                 Enabled = s.Attributes?.Enabled ?? false,
+                Expires = s.Attributes?.Expires,
                 Created = s.Attributes?.Created,
                 Updated = s.Attributes?.Updated,
                 Id = s.Id ?? string.Empty

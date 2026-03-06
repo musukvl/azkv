@@ -10,7 +10,7 @@ public partial class MainWindow
 {
     private async void RefreshKeyVaults()
     {
-        _app.Invoke(_ =>
+        _app.Invoke(() =>
         {
             _statusLabel.Text = "Loading Key Vaults...";
             _keyVaultsList.SetSource(new ObservableCollection<string> { "Loading..." });
@@ -20,7 +20,7 @@ public partial class MainWindow
         {
             _keyVaults = await _azureService.GetAllKeyVaultsAsync();
             
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
                 if (_keyVaults.Any())
                 {
@@ -36,7 +36,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
@@ -75,6 +75,7 @@ public partial class MainWindow
             return;
         
         _selectedKeyVault = _filteredKeyVaults[args.NewValue.Value];
+        var selectedVaultName = _selectedKeyVault.Name;
         _selectedSecret = null;
         _secrets.Clear();
         _filteredSecrets.Clear();
@@ -83,39 +84,56 @@ public partial class MainWindow
         // Clear secret filter when switching key vaults
         _secretFilter.Text = string.Empty;
         
-        _app.Invoke(_ =>
+        _app.Invoke(() =>
         {
-            _statusLabel.Text = $"Loading secrets from {_selectedKeyVault.Name}...";
-            _secretsList.SetSource(new ObservableCollection<string> { "Loading..." });
+            _statusLabel.Text = $"Loading secrets from {selectedVaultName}...";
+            SetSecretsTableSource([]);
             SetVersionsTableSource([]);
             ClearVersionSelectionDetails();
         });
         
         try
         {
-            _secrets = await _azureService.GetSecretsAsync(_selectedKeyVault.Name);
-            _filteredSecrets = new List<Secret>(_secrets);
+            var loadedSecrets = await _azureService.GetSecretsAsync(selectedVaultName);
             
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
+                // Ignore stale results if user switched vaults while the request was in-flight.
+                if (_selectedKeyVault?.Name != selectedVaultName)
+                {
+                    return;
+                }
+
+                _secrets = loadedSecrets;
+                _filteredSecrets = new List<Secret>(_secrets);
+
                 if (_secrets.Any())
                 {
-                    _secretsList.SetSource(new ObservableCollection<string>(_filteredSecrets.Select(s => 
-                        $"{s.Name} {(s.Enabled ? "✓" : "✗")}"
-                    )));
-                    _statusLabel.Text = $"Loaded {_secrets.Count} secret(s) from {_selectedKeyVault.Name}";
+                    FilterSecrets();
+
+                    // Keep the explicit loaded message when no user filter is active.
+                    var hasFilter = !string.IsNullOrWhiteSpace(_secretFilter.Text?.ToString());
+                    if (!hasFilter)
+                    {
+                        _statusLabel.Text = $"Loaded {_secrets.Count} secret(s) from {selectedVaultName}";
+                    }
                 }
                 else
                 {
-                    _secretsList.SetSource(new ObservableCollection<string> { "No secrets found" });
-                    _statusLabel.Text = $"No secrets in {_selectedKeyVault.Name}";
+                    SetSecretsTableSource([]);
+                    _statusLabel.Text = $"No secrets in {selectedVaultName}";
                 }
             });
         }
         catch (Exception ex)
         {
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
+                if (_selectedKeyVault?.Name != selectedVaultName)
+                {
+                    return;
+                }
+
                 _statusLabel.Text = $"Error: {ex.Message}";
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {ex.Message}", "OK");
             });

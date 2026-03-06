@@ -3,7 +3,7 @@ using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
-using System.Collections.ObjectModel;
+using SecretModel = AzureKvManager.Tui.Models.Secret;
 
 namespace AzureKvManager.Tui.Views;
 
@@ -24,13 +24,7 @@ public partial class MainWindow
                 .ToList();
         }
         
-        _secretsList.SetSource(new ObservableCollection<string>(
-            _filteredSecrets.Select(s => 
-            {
-                var contentType = string.IsNullOrWhiteSpace(s.ContentType) ? "" : $" [{s.ContentType}]";
-                return $"{s.Name}{contentType} {(s.Enabled ? "✓" : "✗")}";
-            })
-        ));
+        SetSecretsTableSource(_filteredSecrets);
         
         if (_selectedKeyVault != null)
         {
@@ -40,15 +34,32 @@ public partial class MainWindow
         }
     }
 
-    private async void OnSecretSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
+    private void SetSecretsTableSource(IEnumerable<SecretModel> secrets)
     {
-        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _filteredSecrets.Count || _selectedKeyVault == null)
+        var snapshot = secrets.ToArray();
+
+        _secretsTable.Table = new EnumerableTableSource<SecretModel>(
+            snapshot,
+            new Dictionary<string, Func<SecretModel, object>>
+            {
+                ["Secret Name"] = secret => string.IsNullOrWhiteSpace(secret.Name) ? "(unnamed secret)" : secret.Name,
+                ["Expiration"] = secret => FormatVersionDate(secret.Expires),
+                ["Content Type"] = secret => string.IsNullOrWhiteSpace(secret.ContentType) ? "-" : secret.ContentType
+            }
+        );
+
+        _secretsTable.Update();
+    }
+
+    private async void OnSecretSelectionChanged(object? sender, SelectedCellChangedEventArgs args)
+    {
+        if (args.NewRow < 0 || args.NewRow >= _filteredSecrets.Count || _selectedKeyVault == null)
             return;
         
-        _selectedSecret = _filteredSecrets[args.NewValue.Value];
+        _selectedSecret = _filteredSecrets[args.NewRow];
         _versions.Clear();
         
-        _app.Invoke(_ =>
+        _app.Invoke(() =>
         {
             _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
             SetVersionsTableSource([]);
@@ -185,7 +196,7 @@ public partial class MainWindow
         if (_selectedKeyVault == null)
             return;
 
-        _app.Invoke(_ =>
+        _app.Invoke(() =>
         {
             _statusLabel.Text = $"Creating secret '{name}'...";
         });
@@ -196,7 +207,7 @@ public partial class MainWindow
 
             if (success)
             {
-                _app.Invoke(_ =>
+                _app.Invoke(() =>
                 {
                     _statusLabel.Text = $"Secret '{name}' created successfully";
                     MessageBox.Query(_app, "Success", $"Secret '{name}' has been created successfully!", "OK");
@@ -207,7 +218,7 @@ public partial class MainWindow
             }
             else
             {
-                _app.Invoke(_ =>
+                _app.Invoke(() =>
                 {
                     _statusLabel.Text = $"Failed to create secret '{name}'";
                     MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret '{name}'", "OK");
@@ -216,7 +227,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret: {ex.Message}", "OK");
@@ -235,27 +246,23 @@ public partial class MainWindow
             _filteredSecrets = new List<Secret>(_secrets);
             
             // Reapply filter if there is one
-            var filterText = _secretFilter.Text?.ToString()?.Trim() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(filterText))
+            _app.Invoke(() =>
             {
-                FilterSecrets();
-            }
-            else
-            {
-                _app.Invoke(_ =>
+                var filterText = _secretFilter.Text?.ToString()?.Trim() ?? string.Empty;
+
+                if (!string.IsNullOrWhiteSpace(filterText))
                 {
-                    _secretsList.SetSource(new ObservableCollection<string>(_filteredSecrets.Select(s => 
-                    {
-                        var contentType = string.IsNullOrWhiteSpace(s.ContentType) ? "" : $" [{s.ContentType}]";
-                        return $"{s.Name}{contentType} {(s.Enabled ? "✓" : "✗")}";
-                    })));
-                    _statusLabel.Text = $"Loaded {_secrets.Count} secret(s) from {_selectedKeyVault.Name}";
-                });
-            }
+                    FilterSecrets();
+                    return;
+                }
+
+                SetSecretsTableSource(_filteredSecrets);
+                _statusLabel.Text = $"Loaded {_secrets.Count} secret(s) from {_selectedKeyVault.Name}";
+            });
         }
         catch (Exception ex)
         {
-            _app.Invoke(_ =>
+            _app.Invoke(() =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh secrets: {ex.Message}", "OK");
