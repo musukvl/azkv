@@ -18,7 +18,7 @@ public partial class MainWindow
         if (args.NewRow < 0 || args.NewRow >= _versions.Count || 
             _selectedKeyVault == null || _selectedSecret == null)
         {
-            Application.Invoke(() => ClearVersionSelectionDetails());
+            _app.Invoke(_ => ClearVersionSelectionDetails());
             return;
         }
         
@@ -37,7 +37,7 @@ public partial class MainWindow
         var selectedSecretName = _selectedSecret.Name;
         var selectedVersionId = version.Version;
         
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _selectedVersionId = selectedVersionId;
             _statusLabel.Text = $"Loading secret value...";
@@ -55,7 +55,7 @@ public partial class MainWindow
                 version.Version
             );
             
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
                 {
@@ -80,7 +80,7 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
                 {
@@ -95,7 +95,7 @@ public partial class MainWindow
                 _statusLabel.Text = $"Error: {ex.Message}";
                 _valueView.Text = $"Error: {ex.Message}";
                 _copyButton.Enabled = false;
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load secret value: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {ex.Message}", "OK");
             });
         }
     }
@@ -104,13 +104,13 @@ public partial class MainWindow
     {
         if (_selectedKeyVault == null)
         {
-            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a Key Vault first", "OK");
+            MessageBox.ErrorQuery(_app, "Error", "Please select a Key Vault first", "OK");
             return;
         }
 
         if (_selectedSecret == null)
         {
-            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a secret first", "OK");
+            MessageBox.ErrorQuery(_app, "Error", "Please select a secret first", "OK");
             return;
         }
 
@@ -180,13 +180,13 @@ public partial class MainWindow
 
             if (string.IsNullOrWhiteSpace(value))
             {
-                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret value is required", "OK");
+                MessageBox.ErrorQuery(_app, "Error", "Secret value is required", "OK");
                 return;
             }
 
             if (!TryParseExpirationDate(expirationDateText, out var expiresAt))
             {
-                MessageBox.ErrorQuery(Application.Instance, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
+                MessageBox.ErrorQuery(_app, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
                 return;
             }
 
@@ -204,7 +204,7 @@ public partial class MainWindow
         cancelButton.Accepting += (s, e) => dialog.RequestStop();
 
         dialog.Add(valueLabel, valueField, contentTypeLabel, contentTypeField, expirationDateLabel, expirationDateField, okButton, cancelButton);
-        Application.Run(dialog);
+        _app.Run(dialog);
     }
 
     private async Task CreateSecretVersion(string value, string? contentType, DateTime? expiresAt)
@@ -212,7 +212,7 @@ public partial class MainWindow
         if (_selectedKeyVault == null || _selectedSecret == null)
             return;
 
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = $"Creating new version for '{_selectedSecret.Name}'...";
         });
@@ -223,10 +223,10 @@ public partial class MainWindow
 
             if (success)
             {
-                Application.Invoke(() =>
+                _app.Invoke(_ =>
                 {
                     _statusLabel.Text = $"New version created for '{_selectedSecret.Name}'";
-                    MessageBox.Query(Application.Instance, "Success", $"New version of '{_selectedSecret.Name}' has been created successfully!", "OK");
+                    MessageBox.Query(_app, "Success", $"New version of '{_selectedSecret.Name}' has been created successfully!", "OK");
                 });
 
                 // Refresh the versions list
@@ -234,19 +234,19 @@ public partial class MainWindow
             }
             else
             {
-                Application.Invoke(() =>
+                _app.Invoke(_ =>
                 {
                     _statusLabel.Text = $"Failed to create new version for '{_selectedSecret.Name}'";
-                    MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create new version for '{_selectedSecret.Name}'", "OK");
+                    MessageBox.ErrorQuery(_app, "Error", $"Failed to create new version for '{_selectedSecret.Name}'", "OK");
                 });
             }
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret version: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {ex.Message}", "OK");
             });
         }
     }
@@ -256,7 +256,7 @@ public partial class MainWindow
         if (_selectedKeyVault == null || _selectedSecret == null)
             return;
 
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
             SetVersionsTableSource([]);
@@ -271,7 +271,7 @@ public partial class MainWindow
                 .ThenByDescending(v => v.Version, StringComparer.Ordinal)
                 .ToList();
             
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 SetVersionsTableSource(_versions);
 
@@ -297,10 +297,10 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to refresh versions: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh versions: {ex.Message}", "OK");
             });
         }
     }

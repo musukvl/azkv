@@ -48,7 +48,7 @@ public partial class MainWindow
         _selectedSecret = _filteredSecrets[args.NewValue.Value];
         _versions.Clear();
         
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
             SetVersionsTableSource([]);
@@ -62,7 +62,7 @@ public partial class MainWindow
     {
         if (_selectedKeyVault == null)
         {
-            MessageBox.ErrorQuery(Application.Instance, "Error", "Please select a Key Vault first", "OK");
+            MessageBox.ErrorQuery(_app, "Error", "Please select a Key Vault first", "OK");
             return;
         }
 
@@ -147,19 +147,19 @@ public partial class MainWindow
 
             if (string.IsNullOrWhiteSpace(name))
             {
-                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret name is required", "OK");
+                MessageBox.ErrorQuery(_app, "Error", "Secret name is required", "OK");
                 return;
             }
 
             if (string.IsNullOrWhiteSpace(value))
             {
-                MessageBox.ErrorQuery(Application.Instance, "Error", "Secret value is required", "OK");
+                MessageBox.ErrorQuery(_app, "Error", "Secret value is required", "OK");
                 return;
             }
 
             if (!TryParseExpirationDate(expirationDateText, out var expiresAt))
             {
-                MessageBox.ErrorQuery(Application.Instance, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
+                MessageBox.ErrorQuery(_app, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
                 return;
             }
 
@@ -177,7 +177,7 @@ public partial class MainWindow
         cancelButton.Accepting += (s, e) => dialog.RequestStop();
 
         dialog.Add(nameLabel, nameField, valueLabel, valueField, contentTypeLabel, contentTypeField, expirationDateLabel, expirationDateField, okButton, cancelButton);
-        Application.Run(dialog);
+        _app.Run(dialog);
     }
 
     private async Task CreateSecret(string name, string value, string? contentType, DateTime? expiresAt)
@@ -185,7 +185,7 @@ public partial class MainWindow
         if (_selectedKeyVault == null)
             return;
 
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = $"Creating secret '{name}'...";
         });
@@ -196,10 +196,10 @@ public partial class MainWindow
 
             if (success)
             {
-                Application.Invoke(() =>
+                _app.Invoke(_ =>
                 {
                     _statusLabel.Text = $"Secret '{name}' created successfully";
-                    MessageBox.Query(Application.Instance, "Success", $"Secret '{name}' has been created successfully!", "OK");
+                    MessageBox.Query(_app, "Success", $"Secret '{name}' has been created successfully!", "OK");
                 });
 
                 // Refresh the secrets list
@@ -207,19 +207,19 @@ public partial class MainWindow
             }
             else
             {
-                Application.Invoke(() =>
+                _app.Invoke(_ =>
                 {
                     _statusLabel.Text = $"Failed to create secret '{name}'";
-                    MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret '{name}'", "OK");
+                    MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret '{name}'", "OK");
                 });
             }
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to create secret: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret: {ex.Message}", "OK");
             });
         }
     }
@@ -242,7 +242,7 @@ public partial class MainWindow
             }
             else
             {
-                Application.Invoke(() =>
+                _app.Invoke(_ =>
                 {
                     _secretsList.SetSource(new ObservableCollection<string>(_filteredSecrets.Select(s => 
                     {
@@ -255,10 +255,10 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to refresh secrets: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh secrets: {ex.Message}", "OK");
             });
         }
     }

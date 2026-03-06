@@ -12,6 +12,7 @@ namespace AzureKvManager.Tui.Views;
 
 public partial class MainWindow : Window
 {
+    private readonly IApplication _app;
     private readonly AzureCliService _azureService;
     private TextField _keyVaultFilter;
     private TextField _secretFilter;
@@ -35,8 +36,9 @@ public partial class MainWindow : Window
     private bool _suppressVersionSelectionEvent;
     private string? _selectedVersionId;
 
-    public MainWindow(string? initialFilter = null)
+    public MainWindow(IApplication app, string? initialFilter = null)
     {
+        _app = app ?? throw new ArgumentNullException(nameof(app));
         _azureService = new AzureCliService();
         _initialFilter = initialFilter;
         
@@ -50,7 +52,7 @@ public partial class MainWindow : Window
                 new MenuBarItem("_File", new MenuItem[]
                 {
                     new MenuItem("_Refresh All", "", () => RefreshKeyVaults()),
-                    new MenuItem("_Quit", "", () => Application.RequestStop())
+                    new MenuItem("_Quit", "", () => _app.RequestStop())
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
@@ -307,14 +309,20 @@ public partial class MainWindow : Window
     {
         if (!string.IsNullOrEmpty(_valueView.Text?.ToString()))
         {
-            Application.Clipboard.SetClipboardData(_valueView.Text.ToString()!);
+            if (_app.Clipboard is null)
+            {
+                _statusLabel.Text = "Clipboard is not available.";
+                return;
+            }
+
+            _app.Clipboard.SetClipboardData(_valueView.Text.ToString()!);
             _statusLabel.Text = "Secret value copied to clipboard!";
         }
     }
 
     private void ShowAbout()
     {
-        MessageBox.Query(Application.Instance, "About", 
+        MessageBox.Query(_app, "About", 
             "Azure Key Vault Manager (TUI)\n\n" +
             "A Terminal UI application for managing Azure Key Vaults\n" +
             "Built with Terminal.Gui\n\n" +

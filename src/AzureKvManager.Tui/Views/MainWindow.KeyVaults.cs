@@ -10,7 +10,7 @@ public partial class MainWindow
 {
     private async void RefreshKeyVaults()
     {
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = "Loading Key Vaults...";
             _keyVaultsList.SetSource(new ObservableCollection<string> { "Loading..." });
@@ -20,7 +20,7 @@ public partial class MainWindow
         {
             _keyVaults = await _azureService.GetAllKeyVaultsAsync();
             
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 if (_keyVaults.Any())
                 {
@@ -36,10 +36,10 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
             });
         }
     }
@@ -83,7 +83,7 @@ public partial class MainWindow
         // Clear secret filter when switching key vaults
         _secretFilter.Text = string.Empty;
         
-        Application.Invoke(() =>
+        _app.Invoke(_ =>
         {
             _statusLabel.Text = $"Loading secrets from {_selectedKeyVault.Name}...";
             _secretsList.SetSource(new ObservableCollection<string> { "Loading..." });
@@ -96,7 +96,7 @@ public partial class MainWindow
             _secrets = await _azureService.GetSecretsAsync(_selectedKeyVault.Name);
             _filteredSecrets = new List<Secret>(_secrets);
             
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 if (_secrets.Any())
                 {
@@ -114,10 +114,10 @@ public partial class MainWindow
         }
         catch (Exception ex)
         {
-            Application.Invoke(() =>
+            _app.Invoke(_ =>
             {
                 _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(Application.Instance, "Error", $"Failed to load secrets: {ex.Message}", "OK");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {ex.Message}", "OK");
             });
         }
     }

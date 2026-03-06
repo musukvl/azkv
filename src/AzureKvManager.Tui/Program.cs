@@ -71,17 +71,11 @@ class Program
             }
         }
         
-        Application.Init();
-        
-        try
-        {
-            var mainWindow = new MainWindow(filter);
-            Application.Run(mainWindow);
-        }
-        finally
-        {
-            Application.Shutdown();
-        }
+        using IApplication app = Application.Create();
+        app.Init();
+
+        using var mainWindow = new MainWindow(app, filter);
+        app.Run(mainWindow);
     }
     
     static void ShowHelp()
