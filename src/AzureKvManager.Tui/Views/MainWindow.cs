@@ -144,7 +144,10 @@ public partial class MainWindow : Window
         _secretsTable.MultiSelect = false;
         _secretsTable.Style.ShowVerticalCellLines = false;
         _secretsTable.Style.ShowVerticalHeaderLines = false;
+        _secretsTable.Style.ShowHeaders = false;
         _secretsTable.Style.ExpandLastColumn = true;
+        _secretsTable.Style.ShowHorizontalHeaderOverline = false;
+        _secretsTable.Style.ShowHorizontalHeaderUnderline = false;
 
         SetSecretsTableSource([]);
         _secretsTable.SelectedCellChanged += OnSecretSelectionChanged;
@@ -371,7 +374,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(version))
         {
-            return "-";
+            return " ";
         }
 
         return version.Substring(0, Math.Min(8, version.Length));
@@ -379,7 +382,7 @@ public partial class MainWindow : Window
 
     private static string FormatVersionDate(DateTime? dateTime)
     {
-        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
+        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? " ";
     }
 
     private static void ApplyReadableTextScheme(TextView textView)

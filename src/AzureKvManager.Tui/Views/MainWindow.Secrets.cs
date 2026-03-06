@@ -36,7 +36,7 @@ public partial class MainWindow
             {
                 ["Secret Name"] = secret => string.IsNullOrWhiteSpace(secret.Name) ? "(unnamed secret)" : secret.Name,
                 ["Expiration"] = secret => FormatVersionDate(secret.Expires),
-                ["Content Type"] = secret => string.IsNullOrWhiteSpace(secret.ContentType) ? "-" : secret.ContentType
+                ["Content Type"] = secret => string.IsNullOrWhiteSpace(secret.ContentType) ? " " : secret.ContentType
             }
         );
 
