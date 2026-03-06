@@ -5,7 +5,7 @@ using AzureKvManager.Tui.Models;
 
 namespace AzureKvManager.Tui.Services;
 
-public class AzureCliService
+public class AzureCliService : IAzureKeyVaultDataService
 {
     private readonly JsonSerializerOptions _jsonOptions;
 

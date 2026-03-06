@@ -1,8 +1,7 @@
+using System.Collections.ObjectModel;
 using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.Views;
-using AzureKvManager.Tui.Models;
-using System.Collections.ObjectModel;
 
 namespace AzureKvManager.Tui.Views;
 
@@ -15,128 +14,121 @@ public partial class MainWindow
             _statusLabel.Text = "Loading Key Vaults...";
             _keyVaultsList.SetSource(new ObservableCollection<string> { "Loading..." });
         });
-        
-        try
+
+        var result = await _viewModel.KeyVaults.RefreshAsync();
+
+        _app.Invoke(() =>
         {
-            _keyVaults = await _azureService.GetAllKeyVaultsAsync();
-            
-            _app.Invoke(() =>
+            if (!result.Success)
             {
-                if (_keyVaults.Any())
+                if (result.IsStale)
                 {
-                    // Apply filter (will handle initial filter from command line if present)
-                    FilterKeyVaults();
+                    return;
                 }
-                else
-                {
-                    _keyVaultsList.SetSource(new ObservableCollection<string> { "No Key Vaults found" });
-                    _statusLabel.Text = "No Key Vaults found";
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _app.Invoke(() =>
+
+                var errorMessage = result.ErrorMessage ?? "Unknown error";
+                _statusLabel.Text = $"Error: {errorMessage}";
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {errorMessage}", "OK");
+                return;
+            }
+
+            _viewModel.KeyVaults.ApplyFilter(_keyVaultFilter.Text?.ToString());
+            RenderKeyVaultList();
+
+            if (_viewModel.KeyVaults.AllKeyVaults.Count == 0)
             {
-                _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {ex.Message}", "OK");
-            });
-        }
+                _keyVaultsList.SetSource(new ObservableCollection<string> { "No Key Vaults found" });
+                _statusLabel.Text = "No Key Vaults found";
+            }
+        });
     }
 
     private void FilterKeyVaults()
     {
-        var filterText = _keyVaultFilter.Text?.ToString()?.Trim().ToLowerInvariant() ?? string.Empty;
-        
-        if (string.IsNullOrWhiteSpace(filterText))
-        {
-            _filteredKeyVaults = new List<KeyVault>(_keyVaults);
-        }
-        else
-        {
-            _filteredKeyVaults = _keyVaults
-                .Where(kv => kv.Name.ToLowerInvariant().Contains(filterText) || 
-                            kv.ResourceGroup.ToLowerInvariant().Contains(filterText))
-                .ToList();
-        }
-        
+        _viewModel.KeyVaults.ApplyFilter(_keyVaultFilter.Text?.ToString());
+        RenderKeyVaultList();
+    }
+
+    private void RenderKeyVaultList()
+    {
+        var filteredKeyVaults = _viewModel.KeyVaults.FilteredKeyVaults;
+        var totalKeyVaults = _viewModel.KeyVaults.AllKeyVaults.Count;
+
         _keyVaultsList.SetSource(new ObservableCollection<string>(
-            _filteredKeyVaults.Select(kv => $"{kv.Name} ({kv.ResourceGroup})")
+            filteredKeyVaults.Select(kv => $"{kv.Name} ({kv.ResourceGroup})")
         ));
-        
-        _statusLabel.Text = _filteredKeyVaults.Any() 
-            ? $"Showing {_filteredKeyVaults.Count} of {_keyVaults.Count} Key Vault(s)"
-            : $"No matches found (total: {_keyVaults.Count})";
+
+        if (totalKeyVaults == 0)
+        {
+            _statusLabel.Text = "No Key Vaults found";
+            return;
+        }
+
+        _statusLabel.Text = filteredKeyVaults.Count > 0
+            ? $"Showing {filteredKeyVaults.Count} of {totalKeyVaults} Key Vault(s)"
+            : $"No matches found (total: {totalKeyVaults})";
     }
 
     private async void OnKeyVaultSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)
     {
-        if (!args.NewValue.HasValue || args.NewValue.Value < 0 || args.NewValue.Value >= _filteredKeyVaults.Count)
+        if (!args.NewValue.HasValue)
+        {
             return;
-        
-        _selectedKeyVault = _filteredKeyVaults[args.NewValue.Value];
-        var selectedVaultName = _selectedKeyVault.Name;
-        _selectedSecret = null;
-        _secrets.Clear();
-        _filteredSecrets.Clear();
-        _versions.Clear();
-        
-        // Clear secret filter when switching key vaults
+        }
+
+        if (!_viewModel.KeyVaults.TrySelectByIndex(args.NewValue.Value, out var selectedKeyVault) ||
+            selectedKeyVault is null)
+        {
+            return;
+        }
+
+        var selectedVaultName = selectedKeyVault.Name;
+        _viewModel.ClearFromVaultSelection(selectedVaultName);
+
+        _suppressFilterEvents = true;
         _secretFilter.Text = string.Empty;
-        
+        _suppressFilterEvents = false;
+
         _app.Invoke(() =>
         {
             _statusLabel.Text = $"Loading secrets from {selectedVaultName}...";
             SetSecretsTableSource([]);
             SetVersionsTableSource([]);
-            ClearVersionSelectionDetails();
+            ApplySecretDetailsToView();
         });
-        
-        try
+
+        var loadResult = await _viewModel.Secrets.LoadForVaultAsync(selectedVaultName);
+
+        _app.Invoke(() =>
         {
-            var loadedSecrets = await _azureService.GetSecretsAsync(selectedVaultName);
-            
-            _app.Invoke(() =>
+            if (_viewModel.KeyVaults.SelectedKeyVault?.Name != selectedVaultName)
             {
-                // Ignore stale results if user switched vaults while the request was in-flight.
-                if (_selectedKeyVault?.Name != selectedVaultName)
-                {
-                    return;
-                }
+                return;
+            }
 
-                _secrets = loadedSecrets;
-                _filteredSecrets = new List<Secret>(_secrets);
-
-                if (_secrets.Any())
-                {
-                    FilterSecrets();
-
-                    // Keep the explicit loaded message when no user filter is active.
-                    var hasFilter = !string.IsNullOrWhiteSpace(_secretFilter.Text?.ToString());
-                    if (!hasFilter)
-                    {
-                        _statusLabel.Text = $"Loaded {_secrets.Count} secret(s) from {selectedVaultName}";
-                    }
-                }
-                else
-                {
-                    SetSecretsTableSource([]);
-                    _statusLabel.Text = $"No secrets in {selectedVaultName}";
-                }
-            });
-        }
-        catch (Exception ex)
-        {
-            _app.Invoke(() =>
+            if (loadResult.IsStale)
             {
-                if (_selectedKeyVault?.Name != selectedVaultName)
-                {
-                    return;
-                }
+                return;
+            }
 
-                _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {ex.Message}", "OK");
-            });
-        }
+            if (!loadResult.Success)
+            {
+                var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
+                _statusLabel.Text = $"Error: {errorMessage}";
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {errorMessage}", "OK");
+                return;
+            }
+
+            FilterSecrets();
+
+            if (_viewModel.Secrets.AllSecrets.Count == 0)
+            {
+                SetSecretsTableSource([]);
+                _statusLabel.Text = $"No secrets in {selectedVaultName}";
+                return;
+            }
+
+            _statusLabel.Text = $"Loaded {_viewModel.Secrets.AllSecrets.Count} secret(s) from {selectedVaultName}";
+        });
     }
 }

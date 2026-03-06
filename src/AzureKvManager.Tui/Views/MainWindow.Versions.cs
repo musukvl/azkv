@@ -3,6 +3,7 @@ using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
+using AzureKvManager.Tui.Services;
 
 namespace AzureKvManager.Tui.Views;
 
@@ -15,108 +16,95 @@ public partial class MainWindow
             return;
         }
 
-        if (args.NewRow < 0 || args.NewRow >= _versions.Count || 
-            _selectedKeyVault == null || _selectedSecret == null)
+        var selectedKeyVault = _viewModel.KeyVaults.SelectedKeyVault;
+        var selectedSecret = _viewModel.Secrets.SelectedSecret;
+
+        if (selectedKeyVault == null || selectedSecret == null)
         {
-            _app.Invoke(_ => ClearVersionSelectionDetails());
+            _viewModel.SecretDetails.Clear();
+            _app.Invoke(_ => ApplySecretDetailsToView());
             return;
         }
-        
-        var version = _versions[args.NewRow];
-        await LoadVersionDetailsAsync(version);
+
+        if (!_viewModel.Versions.TrySelectByIndex(args.NewRow, out var selectedVersion) || selectedVersion == null)
+        {
+            _viewModel.SecretDetails.Clear();
+            _app.Invoke(_ => ApplySecretDetailsToView());
+            return;
+        }
+
+        await LoadVersionDetailsAsync(selectedVersion);
     }
 
     private async Task LoadVersionDetailsAsync(SecretVersion version)
     {
-        if (_selectedKeyVault == null || _selectedSecret == null)
+        var selectedKeyVault = _viewModel.KeyVaults.SelectedKeyVault;
+        var selectedSecret = _viewModel.Secrets.SelectedSecret;
+
+        if (selectedKeyVault == null || selectedSecret == null)
         {
             return;
         }
 
-        var selectedVaultName = _selectedKeyVault.Name;
-        var selectedSecretName = _selectedSecret.Name;
-        var selectedVersionId = version.Version;
+        var selectedVaultName = selectedKeyVault.Name;
+        var selectedSecretName = selectedSecret.Name;
+
+        var loadTask = _viewModel.SecretDetails.LoadForVersionAsync(selectedVaultName, selectedSecretName, version);
+
+        _app.Invoke(_ =>
+        {
+            _statusLabel.Text = $"Loading secret value...";
+            ApplySecretDetailsToView();
+        });
+
+        var loadResult = await loadTask;
         
         _app.Invoke(_ =>
         {
-            _selectedVersionId = selectedVersionId;
-            _statusLabel.Text = $"Loading secret value...";
-            _contentTypeView.Text = string.IsNullOrWhiteSpace(version.ContentType) ? "(none)" : version.ContentType;
-            _expirationLabel.Text = BuildExpirationDetailsText(version.Expires);
-            _valueView.Text = "Loading...";
-            _copyButton.Enabled = false;
+            if (_viewModel.KeyVaults.SelectedKeyVault?.Name != selectedVaultName ||
+                _viewModel.Secrets.SelectedSecret?.Name != selectedSecretName)
+            {
+                return;
+            }
+
+            if (loadResult.IsStale)
+            {
+                return;
+            }
+
+            ApplySecretDetailsToView();
+
+            if (!loadResult.Success)
+            {
+                var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
+                _statusLabel.Text = $"Error: {errorMessage}";
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {errorMessage}", "OK");
+                return;
+            }
+
+            _statusLabel.Text = $"Loaded value for {selectedSecretName} (version {ShortVersion(version.Version)}...)";
         });
-        
-        try
-        {
-            var details = await _azureService.GetSecretVersionDetailsAsync(
-                selectedVaultName,
-                selectedSecretName,
-                version.Version
-            );
-            
-            _app.Invoke(_ =>
-            {
-                if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
-                {
-                    return;
-                }
-
-                if (_selectedVersionId != selectedVersionId)
-                {
-                    return;
-                }
-
-                var resolvedContentType = details?.ContentType ?? version.ContentType;
-                var resolvedExpiration = details?.Expires ?? version.Expires;
-                var resolvedValue = details?.Value;
-
-                _contentTypeView.Text = string.IsNullOrWhiteSpace(resolvedContentType) ? "(none)" : resolvedContentType;
-                _expirationLabel.Text = BuildExpirationDetailsText(resolvedExpiration);
-                _valueView.Text = resolvedValue ?? "(empty)";
-                _copyButton.Enabled = !string.IsNullOrWhiteSpace(resolvedValue);
-                _statusLabel.Text = $"Loaded value for {selectedSecretName} (version {ShortVersion(version.Version)}...)";
-            });
-        }
-        catch (Exception ex)
-        {
-            _app.Invoke(_ =>
-            {
-                if (_selectedKeyVault?.Name != selectedVaultName || _selectedSecret?.Name != selectedSecretName)
-                {
-                    return;
-                }
-
-                if (_selectedVersionId != selectedVersionId)
-                {
-                    return;
-                }
-
-                _statusLabel.Text = $"Error: {ex.Message}";
-                _valueView.Text = $"Error: {ex.Message}";
-                _copyButton.Enabled = false;
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {ex.Message}", "OK");
-            });
-        }
     }
 
     private void ShowAddVersionDialog()
     {
-        if (_selectedKeyVault == null)
+        if (_viewModel.KeyVaults.SelectedKeyVault == null)
         {
             MessageBox.ErrorQuery(_app, "Error", "Please select a Key Vault first", "OK");
             return;
         }
 
-        if (_selectedSecret == null)
+        if (_viewModel.Secrets.SelectedSecret == null)
         {
             MessageBox.ErrorQuery(_app, "Error", "Please select a secret first", "OK");
             return;
         }
 
+        var selectedSecretName = _viewModel.Secrets.SelectedSecret.Name;
+
         var dialog = new Dialog
         {
-            Title = $"Add New Version to '{_selectedSecret.Name}'",
+            Title = $"Add New Version to '{selectedSecretName}'",
             Width = Dim.Percent(60),
             Height = 12
         };
@@ -178,20 +166,18 @@ public partial class MainWindow
             var contentType = contentTypeField.Text?.ToString()?.Trim();
             var expirationDateText = expirationDateField.Text?.ToString();
 
-            if (string.IsNullOrWhiteSpace(value))
+            if (!SecretFormValidator.TryValidateNewVersion(
+                    value,
+                    expirationDateText,
+                    out var expiresAt,
+                    out var errorMessage))
             {
-                MessageBox.ErrorQuery(_app, "Error", "Secret value is required", "OK");
-                return;
-            }
-
-            if (!TryParseExpirationDate(expirationDateText, out var expiresAt))
-            {
-                MessageBox.ErrorQuery(_app, "Error", "Expiration date must be in yyyy-MM-dd format", "OK");
+                MessageBox.ErrorQuery(_app, "Error", errorMessage ?? "Invalid input", "OK");
                 return;
             }
 
             dialog.RequestStop();
-            await CreateSecretVersion(value, contentType, expiresAt);
+            await CreateSecretVersion(value!, contentType, expiresAt);
         };
 
         var cancelButton = new Button
@@ -209,94 +195,97 @@ public partial class MainWindow
 
     private async Task CreateSecretVersion(string value, string? contentType, DateTime? expiresAt)
     {
-        if (_selectedKeyVault == null || _selectedSecret == null)
+        var selectedSecret = _viewModel.Secrets.SelectedSecret;
+        if (_viewModel.KeyVaults.SelectedKeyVault == null || selectedSecret == null)
             return;
+
+        var selectedSecretName = selectedSecret.Name;
 
         _app.Invoke(_ =>
         {
-            _statusLabel.Text = $"Creating new version for '{_selectedSecret.Name}'...";
+            _statusLabel.Text = $"Creating new version for '{selectedSecretName}'...";
         });
 
-        try
-        {
-            var success = await _azureService.SetSecretAsync(_selectedKeyVault.Name, _selectedSecret.Name, value, contentType, expiresAt);
+        var createResult = await _viewModel.Versions.CreateVersionAsync(value, contentType, expiresAt);
 
-            if (success)
-            {
-                _app.Invoke(_ =>
-                {
-                    _statusLabel.Text = $"New version created for '{_selectedSecret.Name}'";
-                    MessageBox.Query(_app, "Success", $"New version of '{_selectedSecret.Name}' has been created successfully!", "OK");
-                });
-
-                // Refresh the versions list
-                await RefreshVersionsForSelectedSecret();
-            }
-            else
-            {
-                _app.Invoke(_ =>
-                {
-                    _statusLabel.Text = $"Failed to create new version for '{_selectedSecret.Name}'";
-                    MessageBox.ErrorQuery(_app, "Error", $"Failed to create new version for '{_selectedSecret.Name}'", "OK");
-                });
-            }
-        }
-        catch (Exception ex)
+        if (createResult.Success)
         {
             _app.Invoke(_ =>
             {
-                _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {ex.Message}", "OK");
+                _statusLabel.Text = $"New version created for '{selectedSecretName}'";
+                MessageBox.Query(_app, "Success", $"New version of '{selectedSecretName}' has been created successfully!", "OK");
             });
+
+            // Refresh the versions list
+            await RefreshVersionsForSelectedSecret();
+            return;
         }
+
+        _app.Invoke(_ =>
+        {
+            var errorMessage = createResult.ErrorMessage ?? $"Failed to create new version for '{selectedSecretName}'";
+            _statusLabel.Text = $"Error: {errorMessage}";
+            MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {errorMessage}", "OK");
+        });
     }
 
     private async Task RefreshVersionsForSelectedSecret()
     {
-        if (_selectedKeyVault == null || _selectedSecret == null)
+        var selectedKeyVault = _viewModel.KeyVaults.SelectedKeyVault;
+        var selectedSecret = _viewModel.Secrets.SelectedSecret;
+
+        if (selectedKeyVault == null || selectedSecret == null)
             return;
+
+        var selectedVaultName = selectedKeyVault.Name;
+        var selectedSecretName = selectedSecret.Name;
 
         _app.Invoke(_ =>
         {
-            _statusLabel.Text = $"Loading versions for {_selectedSecret.Name}...";
+            _statusLabel.Text = $"Loading versions for {selectedSecretName}...";
             SetVersionsTableSource([]);
-            ClearVersionSelectionDetails();
+            _viewModel.SecretDetails.Clear();
+            ApplySecretDetailsToView();
         });
 
-        try
-        {
-            var versions = await _azureService.GetSecretVersionsAsync(_selectedKeyVault.Name, _selectedSecret.Name);
-            _versions = versions
-                .OrderByDescending(GetVersionSortKey)
-                .ThenByDescending(v => v.Version, StringComparer.Ordinal)
-                .ToList();
-            
-            _app.Invoke(_ =>
-            {
-                SetVersionsTableSource(_versions);
+        var loadResult = await _viewModel.Versions.LoadForSecretAsync(selectedVaultName, selectedSecretName);
 
-                if (_versions.Any())
-                {
-                    _statusLabel.Text = $"Loaded {_versions.Count} version(s) for {_selectedSecret.Name}";
-
-                    // Do not auto-select any version. Load details only when user selects one.
-                    _suppressVersionSelectionEvent = true;
-                    _versionsTable.SelectedRow = -1;
-                    _suppressVersionSelectionEvent = false;
-                }
-                else
-                {
-                    _statusLabel.Text = $"No versions for {_selectedSecret.Name}";
-                }
-            });
-        }
-        catch (Exception ex)
+        _app.Invoke(_ =>
         {
-            _app.Invoke(_ =>
+            if (_viewModel.KeyVaults.SelectedKeyVault?.Name != selectedVaultName ||
+                _viewModel.Secrets.SelectedSecret?.Name != selectedSecretName)
             {
-                _statusLabel.Text = $"Error: {ex.Message}";
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh versions: {ex.Message}", "OK");
-            });
-        }
+                return;
+            }
+
+            if (loadResult.IsStale)
+            {
+                return;
+            }
+
+            if (!loadResult.Success)
+            {
+                var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
+                _statusLabel.Text = $"Error: {errorMessage}";
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh versions: {errorMessage}", "OK");
+                return;
+            }
+
+            SetVersionsTableSource(_viewModel.Versions.Versions);
+
+            if (_viewModel.Versions.Versions.Count > 0)
+            {
+                _statusLabel.Text = $"Loaded {_viewModel.Versions.Versions.Count} version(s) for {selectedSecretName}";
+
+                // Do not auto-select any version. Load details only when user selects one.
+                _suppressVersionSelectionEvent = true;
+                _versionsTable.SelectedRow = -1;
+                _suppressVersionSelectionEvent = false;
+            }
+            else
+            {
+                _statusLabel.Text = $"No versions for {selectedSecretName}";
+            }
+        });
     }
 }
