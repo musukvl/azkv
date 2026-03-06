@@ -3,44 +3,33 @@ using Terminal.Gui.App;
 using Terminal.Gui.Drivers;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
-using AzureKvManager.Tui.Services;
 using AzureKvManager.Tui.Models;
-using System.Collections.ObjectModel;
 using System.Globalization;
+using AzureKvManager.Tui.ViewModels;
 
 namespace AzureKvManager.Tui.Views;
 
 public partial class MainWindow : Window
 {
     private readonly IApplication _app;
-    private readonly AzureCliService _azureService;
+    private readonly MainWindowViewModel _viewModel;
     private TextField _keyVaultFilter;
     private TextField _secretFilter;
     private ListView _keyVaultsList;
-    private ListView _secretsList;
+    private TableView _secretsTable;
     private TableView _versionsTable;
     private Button _copyButton;
     private TextView _contentTypeView;
     private Label _expirationLabel;
     private TextView _valueView;
     private Label _statusLabel;
-    
-    private List<KeyVault> _keyVaults = new();
-    private List<KeyVault> _filteredKeyVaults = new();
-    private List<Secret> _secrets = new();
-    private List<Secret> _filteredSecrets = new();
-    private List<SecretVersion> _versions = new();
-    private KeyVault? _selectedKeyVault;
-    private Secret? _selectedSecret;
-    private string? _initialFilter;
+    private bool _suppressFilterEvents;
     private bool _suppressVersionSelectionEvent;
-    private string? _selectedVersionId;
 
-    public MainWindow(IApplication app, string? initialFilter = null)
+    public MainWindow(IApplication app, MainWindowViewModel viewModel, string? initialFilter = null)
     {
         _app = app ?? throw new ArgumentNullException(nameof(app));
-        _azureService = new AzureCliService();
-        _initialFilter = initialFilter;
+        _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
         
         Title = "Azure Key Vault Manager (TUI)";
         
@@ -88,7 +77,15 @@ public partial class MainWindow : Window
             Width = Dim.Fill(),
             Height = 1
         };
-        _keyVaultFilter.TextChanged += (s, e) => FilterKeyVaults();
+        _keyVaultFilter.TextChanged += (s, e) =>
+        {
+            if (_suppressFilterEvents)
+            {
+                return;
+            }
+
+            FilterKeyVaults();
+        };
         
         _keyVaultsList = new ListView
         {
@@ -125,27 +122,45 @@ public partial class MainWindow : Window
             Width = Dim.Fill(),
             Height = 1
         };
-        _secretFilter.TextChanged += (s, e) => FilterSecrets();
+        _secretFilter.TextChanged += (s, e) =>
+        {
+            if (_suppressFilterEvents)
+            {
+                return;
+            }
+
+            FilterSecrets();
+        };
         
-        _secretsList = new ListView
+        _secretsTable = new TableView
         {
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Fill(1)
         };
-        
-        _secretsList.ValueChanged += OnSecretSelectionChanged;
+
+        _secretsTable.FullRowSelect = true;
+        _secretsTable.MultiSelect = false;
+        _secretsTable.Style.ShowVerticalCellLines = false;
+        _secretsTable.Style.ShowVerticalHeaderLines = false;
+        _secretsTable.Style.ShowHeaders = false;
+        _secretsTable.Style.ExpandLastColumn = true;
+        _secretsTable.Style.ShowHorizontalHeaderOverline = false;
+        _secretsTable.Style.ShowHorizontalHeaderUnderline = false;
+
+        SetSecretsTableSource([]);
+        _secretsTable.SelectedCellChanged += OnSecretSelectionChanged;
         
         var addSecretButton = new Button
         {
             Text = "New _Secret",
             X = 0,
-            Y = Pos.Bottom(_secretsList)
+            Y = Pos.Bottom(_secretsTable)
         };
         addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
         
-        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsList, addSecretButton);
+        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsTable, addSecretButton);
         
         var versionsFrame = new FrameView
         {
@@ -170,7 +185,7 @@ public partial class MainWindow : Window
         _versionsTable.Style.ShowVerticalHeaderLines = false;
         _versionsTable.Style.ExpandLastColumn = true;
 
-        SetVersionsTableSource(_versions);
+        SetVersionsTableSource(_viewModel.Versions.Versions);
         
         _versionsTable.SelectedCellChanged += OnVersionSelectionChanged;
 
@@ -283,7 +298,7 @@ public partial class MainWindow : Window
         
         valueFrame.Add(_valueView);
 
-        ClearVersionSelectionDetails();
+        ApplySecretDetailsToView();
         
         _statusLabel = new Label
         {
@@ -296,9 +311,11 @@ public partial class MainWindow : Window
         Add(keyVaultsFrame, secretsFrame, versionsFrame, actionsFrame, contentTypeFrame, expirationFrame, valueFrame, _statusLabel);
         
         // Apply initial filter if provided
-        if (!string.IsNullOrEmpty(_initialFilter))
+        if (!string.IsNullOrEmpty(initialFilter))
         {
-            _keyVaultFilter.Text = _initialFilter;
+            _suppressFilterEvents = true;
+            _keyVaultFilter.Text = initialFilter;
+            _suppressFilterEvents = false;
         }
         
         // Load key vaults on startup
@@ -307,7 +324,7 @@ public partial class MainWindow : Window
 
     private void CopySecretValue()
     {
-        if (!string.IsNullOrEmpty(_valueView.Text?.ToString()))
+        if (!string.IsNullOrWhiteSpace(_viewModel.SecretDetails.CopyableValue))
         {
             if (_app.Clipboard is null)
             {
@@ -315,7 +332,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _app.Clipboard.SetClipboardData(_valueView.Text.ToString()!);
+            _app.Clipboard.SetClipboardData(_viewModel.SecretDetails.CopyableValue);
             _statusLabel.Text = "Secret value copied to clipboard!";
         }
     }
@@ -357,7 +374,7 @@ public partial class MainWindow : Window
     {
         if (string.IsNullOrWhiteSpace(version))
         {
-            return "-";
+            return " ";
         }
 
         return version.Substring(0, Math.Min(8, version.Length));
@@ -365,17 +382,7 @@ public partial class MainWindow : Window
 
     private static string FormatVersionDate(DateTime? dateTime)
     {
-        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "-";
-    }
-
-    private static string FormatVersionDateTime(DateTime dateTime)
-    {
-        return dateTime.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-    }
-
-    private static DateTime GetVersionSortKey(SecretVersion version)
-    {
-        return version.Created ?? version.Updated ?? DateTime.MinValue;
+        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? " ";
     }
 
     private static void ApplyReadableTextScheme(TextView textView)
@@ -394,62 +401,17 @@ public partial class MainWindow : Window
         });
     }
 
-    private string BuildExpirationDetailsText(DateTime? expiresAt)
-    {
-        if (!expiresAt.HasValue)
-        {
-            return "Expiration: (not set)";
-        }
-
-        var formatted = FormatVersionDateTime(expiresAt.Value);
-        return IsExpired(expiresAt.Value)
-            ? $"Expiration: ⚠ EXPIRED ({formatted})"
-            : $"Expiration: {formatted}";
-    }
-
     private void ClearVersionSelectionDetails(bool clearValue = true)
     {
-        _selectedVersionId = null;
-        _contentTypeView.Text = string.Empty;
-        _expirationLabel.Text = "Expiration: (select a version)";
-
-        if (clearValue)
-        {
-            _valueView.Text = string.Empty;
-        }
-
-        _copyButton.Enabled = false;
+        _viewModel.SecretDetails.Clear(clearValue);
+        ApplySecretDetailsToView();
     }
 
-    private static bool IsExpired(DateTime expiresAt)
+    private void ApplySecretDetailsToView()
     {
-        var expiresUtc = expiresAt.Kind == DateTimeKind.Unspecified
-            ? DateTime.SpecifyKind(expiresAt, DateTimeKind.Utc)
-            : expiresAt.ToUniversalTime();
-
-        return expiresUtc < DateTime.UtcNow;
-    }
-
-    private static bool TryParseExpirationDate(string? input, out DateTime? expiresAt)
-    {
-        expiresAt = null;
-
-        if (string.IsNullOrWhiteSpace(input))
-        {
-            return true;
-        }
-
-        if (!DateTime.TryParseExact(
-                input.Trim(),
-                "yyyy-MM-dd",
-                CultureInfo.InvariantCulture,
-                DateTimeStyles.None,
-                out var parsedDate))
-        {
-            return false;
-        }
-
-        expiresAt = DateTime.SpecifyKind(parsedDate, DateTimeKind.Utc);
-        return true;
+        _contentTypeView.Text = _viewModel.SecretDetails.ContentTypeText;
+        _expirationLabel.Text = _viewModel.SecretDetails.ExpirationText;
+        _valueView.Text = _viewModel.SecretDetails.ValueText;
+        _copyButton.Enabled = _viewModel.SecretDetails.CanCopy;
     }
 }

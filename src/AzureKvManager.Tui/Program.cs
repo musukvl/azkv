@@ -1,8 +1,9 @@
 using Terminal.Gui;
 using Terminal.Gui.App;
 using AzureKvManager.Tui.Views;
+using AzureKvManager.Tui.Services;
+using AzureKvManager.Tui.ViewModels;
 using Spectre.Console;
-using System.Diagnostics;
 
 namespace AzureKvManager.Tui;
 
@@ -40,41 +41,21 @@ class Program
         // Change Azure subscription if specified
         if (!string.IsNullOrEmpty(subscription))
         {
-            try
+            var subscriptionService = new SubscriptionService();
+            if (!subscriptionService.TrySetSubscription(subscription, out var errorMessage))
             {
-                var processInfo = new ProcessStartInfo
-                {
-                    FileName = "/bin/bash",
-                    Arguments = $"-c \"az account set --subscription '{subscription}'\"",
-                    UseShellExecute = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    CreateNoWindow = true
-                };
-
-                using var process = Process.Start(processInfo);
-                if (process != null)
-                {
-                    process.WaitForExit();
-                    if (process.ExitCode != 0)
-                    {
-                        var error = process.StandardError.ReadToEnd();
-                        AnsiConsole.MarkupLine($"[red]Failed to switch subscription:[/] {error}");
-                        return;
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AnsiConsole.MarkupLine($"[red]Error switching subscription:[/] {ex.Message}");
+                AnsiConsole.MarkupLine($"[red]Failed to switch subscription:[/] {errorMessage}");
                 return;
             }
         }
         
+        var azureService = new AzureCliService();
+        var mainWindowViewModel = new MainWindowViewModel(azureService);
+
         using IApplication app = Application.Create();
         app.Init();
 
-        using var mainWindow = new MainWindow(app, filter);
+        using var mainWindow = new MainWindow(app, mainWindowViewModel, filter);
         app.Run(mainWindow);
     }
     
