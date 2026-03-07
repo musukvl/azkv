@@ -163,8 +163,16 @@ public partial class MainWindow : Window
             Y = Pos.Bottom(_secretsTable)
         };
         addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
-        
-        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsTable, addSecretButton);
+
+        var reloadSecretsButton = new Button
+        {
+            Text = "_Reload",
+            X = Pos.Right(addSecretButton) + 1,
+            Y = Pos.Bottom(_secretsTable)
+        };
+        reloadSecretsButton.Accepting += async (s, e) => await ReloadSecrets();
+
+        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsTable, addSecretButton, reloadSecretsButton);
         
         var versionsFrame = new FrameView
         {

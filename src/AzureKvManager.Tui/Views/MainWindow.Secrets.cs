@@ -216,6 +216,23 @@ public partial class MainWindow
         });
     }
 
+    private async Task ReloadSecrets()
+    {
+        var selectedVault = _viewModel.KeyVaults.SelectedKeyVault;
+        if (selectedVault is null)
+        {
+            MessageBox.ErrorQuery(_app, "Error", "Please select a Key Vault first", "OK");
+            return;
+        }
+
+        _app.Invoke(() =>
+        {
+            _statusLabel.Text = $"Reloading secrets from {selectedVault.Name}...";
+        });
+
+        await RefreshSecretsForSelectedVault();
+    }
+
     private async Task RefreshSecretsForSelectedVault()
     {
         var selectedVault = _viewModel.KeyVaults.SelectedKeyVault;
