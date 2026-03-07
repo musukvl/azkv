@@ -80,7 +80,7 @@ public partial class MainWindow
         {
             Title = "Add New Secret",
             Width = Dim.Percent(60),
-            Height = 14
+            Height = Dim.Auto(minimumContentDim: 16)
         };
 
         var nameLabel = new Label
@@ -93,7 +93,7 @@ public partial class MainWindow
         var nameField = new TextField
         {
             X = 1,
-            Y = 2,
+            Y = Pos.Bottom(nameLabel),
             Width = Dim.Fill(1)
         };
 
@@ -101,13 +101,13 @@ public partial class MainWindow
         {
             Text = "Secret Value:",
             X = 1,
-            Y = 3
+            Y = Pos.Bottom(nameField) + 1
         };
 
         var valueField = new TextView
         {
             X = 1,
-            Y = 4,
+            Y = Pos.Bottom(valueLabel),
             Width = Dim.Fill(1),
             Height = 3
         };
@@ -116,13 +116,13 @@ public partial class MainWindow
         {
             Text = "Content Type (optional):",
             X = 1,
-            Y = 7
+            Y = Pos.Bottom(valueField) + 1
         };
 
         var contentTypeField = new TextField
         {
             X = 1,
-            Y = 8,
+            Y = Pos.Bottom(contentTypeLabel),
             Width = Dim.Fill(1)
         };
 
@@ -130,13 +130,13 @@ public partial class MainWindow
         {
             Text = "Expiration Date (yyyy-MM-dd, optional):",
             X = 1,
-            Y = 9
+            Y = Pos.Bottom(contentTypeField) + 1
         };
 
         var expirationDateField = new TextField
         {
             X = 1,
-            Y = 10,
+            Y = Pos.Bottom(expirationDateLabel),
             Width = Dim.Fill(1)
         };
 
@@ -145,7 +145,7 @@ public partial class MainWindow
             Text = "OK",
             IsDefault = true,
             X = Pos.Center() - 10,
-            Y = Pos.Bottom(dialog) - 2
+            Y = Pos.Bottom(expirationDateField) + 1
         };
 
         okButton.Accepting += async (s, e) =>
@@ -174,7 +174,7 @@ public partial class MainWindow
         {
             Text = "Cancel",
             X = Pos.Center() + 2,
-            Y = Pos.Bottom(dialog) - 2
+            Y = Pos.Bottom(expirationDateField) + 1
         };
 
         cancelButton.Accepting += (s, e) => dialog.RequestStop();
