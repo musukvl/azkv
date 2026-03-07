@@ -38,8 +38,7 @@ public class AzureCliService : IAzureKeyVaultDataService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error parsing key vaults: {ex.Message}");
-            return [];
+            throw new AzureCliException($"Failed to parse key vault list: {ex.Message}", ex);
         }
     }
 
@@ -66,8 +65,7 @@ public class AzureCliService : IAzureKeyVaultDataService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error parsing secrets: {ex.Message}");
-            return [];
+            throw new AzureCliException($"Failed to parse secret list: {ex.Message}", ex);
         }
     }
 
@@ -93,8 +91,7 @@ public class AzureCliService : IAzureKeyVaultDataService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error parsing secret versions: {ex.Message}");
-            return [];
+            throw new AzureCliException($"Failed to parse secret versions: {ex.Message}", ex);
         }
     }
 
@@ -113,8 +110,7 @@ public class AzureCliService : IAzureKeyVaultDataService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting secret value: {ex.Message}");
-            return null;
+            throw new AzureCliException($"Failed to parse secret value: {ex.Message}", ex);
         }
     }
 
@@ -147,8 +143,7 @@ public class AzureCliService : IAzureKeyVaultDataService
         }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error getting secret version details: {ex.Message}");
-            return null;
+            throw new AzureCliException($"Failed to parse secret version details: {ex.Message}", ex);
         }
     }
 
@@ -201,16 +196,21 @@ public class AzureCliService : IAzureKeyVaultDataService
 
             if (process.ExitCode != 0)
             {
-                Console.WriteLine($"Azure CLI error: {error}");
-                return string.Empty;
+                var errorMessage = string.IsNullOrWhiteSpace(error)
+                    ? $"Azure CLI command failed with exit code {process.ExitCode}"
+                    : error.Trim();
+                throw new AzureCliException(errorMessage);
             }
 
             return output;
         }
+        catch (AzureCliException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
-            Console.WriteLine($"Error executing Azure CLI command: {ex.Message}");
-            return string.Empty;
+            throw new AzureCliException($"Failed to execute Azure CLI: {ex.Message}", ex);
         }
     }
 
