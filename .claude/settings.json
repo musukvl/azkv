@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Read(//home/musuk/.nuget/packages/terminal.gui/2.0.0-develop.5100/lib/**)",
+      "Bash(dotnet script eval 'using Terminal.Gui; using Terminal.Gui.Drawing; Console.WriteLine\\(typeof\\(Scheme\\).GetMethods\\(\\).Select\\(m => m.Name\\).Distinct\\(\\).Aggregate\\(\\(a,b\\) => a + \"\", \"\" + b\\)\\);')"
     ]
   }
 }

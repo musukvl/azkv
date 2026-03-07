@@ -3,6 +3,7 @@ using Terminal.Gui.App;
 using AzureKvManager.Tui.Views;
 using AzureKvManager.Tui.Services;
 using AzureKvManager.Tui.ViewModels;
+using AzureKvManager.Tui.Themes;
 using Spectre.Console;
 
 namespace AzureKvManager.Tui;
@@ -20,6 +21,7 @@ class Program
         
         string? subscription = null;
         string? filter = null;
+        string? themeName = null;
 
         // Parse command-line arguments
         for (int i = 0; i < args.Length; i++)
@@ -29,6 +31,13 @@ class Program
                 if (i + 1 < args.Length)
                 {
                     subscription = args[++i];
+                }
+            }
+            else if (args[i] == "-t" || args[i] == "--theme")
+            {
+                if (i + 1 < args.Length)
+                {
+                    themeName = args[++i];
                 }
             }
             else if (!args[i].StartsWith("-"))
@@ -55,6 +64,12 @@ class Program
         using IApplication app = Application.Create();
         app.Init();
 
+        ThemeProvider.SaveDefaults();
+        if (!string.IsNullOrEmpty(themeName))
+        {
+            ThemeProvider.ApplyTheme(themeName);
+        }
+
         using var mainWindow = new MainWindow(app, mainWindowViewModel, filter);
         app.Run(mainWindow);
     }
@@ -73,6 +88,7 @@ class Program
         
         AnsiConsole.MarkupLine("[bold]OPTIONS:[/]");
         AnsiConsole.MarkupLine("  [cyan]-s, --subscription[/] [grey]<NAME>[/]     Switch to the specified Azure subscription");
+        AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]            Set color theme (grayscale, far-blue, matrix)");
         AnsiConsole.MarkupLine("  [cyan]-h, --help[/]                          Show this help message");
         AnsiConsole.WriteLine();
         
@@ -85,6 +101,8 @@ class Program
         AnsiConsole.MarkupLine("  azurekv bip                      Launch with 'bip' filter applied to Key Vaults");
         AnsiConsole.MarkupLine("  azurekv -s my-subscription       Switch subscription before launching");
         AnsiConsole.MarkupLine("  azurekv -s my-sub prod           Switch subscription and filter by 'prod'");
+        AnsiConsole.MarkupLine("  azurekv -t far-blue              Launch with FAR blue theme");
+        AnsiConsole.MarkupLine("  azurekv -t matrix                Launch with Matrix green theme");
         AnsiConsole.WriteLine();
         
         AnsiConsole.MarkupLine("[bold]NAVIGATION:[/]");

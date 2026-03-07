@@ -5,6 +5,7 @@ using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
 using System.Globalization;
+using AzureKvManager.Tui.Themes;
 using AzureKvManager.Tui.ViewModels;
 
 namespace AzureKvManager.Tui.Views;
@@ -42,6 +43,13 @@ public partial class MainWindow : Window
                 {
                     new MenuItem("_Refresh All", "", () => RefreshKeyVaults()),
                     new MenuItem("_Quit", "", () => _app.RequestStop())
+                }),
+                new MenuBarItem("_Theme", new MenuItem[]
+                {
+                    new MenuItem("_Default", "", () => SwitchTheme(ThemeProvider.DefaultThemeName)),
+                    new MenuItem("_Grayscale", "", () => SwitchTheme("grayscale")),
+                    new MenuItem("_Far Blue", "", () => SwitchTheme("far-blue")),
+                    new MenuItem("_Matrix Green", "", () => SwitchTheme("matrix"))
                 }),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
@@ -383,6 +391,14 @@ public partial class MainWindow : Window
     private static string FormatVersionDate(DateTime? dateTime)
     {
         return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? " ";
+    }
+
+    private void SwitchTheme(string themeName)
+    {
+        ThemeProvider.ApplyTheme(themeName);
+        ApplyReadableTextScheme(_contentTypeView);
+        ApplyReadableTextScheme(_valueView);
+        SetNeedsDraw();
     }
 
     private static void ApplyReadableTextScheme(TextView textView)
