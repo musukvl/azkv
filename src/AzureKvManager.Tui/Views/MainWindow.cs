@@ -44,13 +44,9 @@ public partial class MainWindow : Window
                     new MenuItem("_Refresh All", "", () => RefreshKeyVaults()),
                     new MenuItem("_Quit", "", () => _app.RequestStop())
                 }),
-                new MenuBarItem("_Theme", new MenuItem[]
-                {
-                    new MenuItem("_Default", "", () => SwitchTheme(ThemeProvider.DefaultThemeName)),
-                    new MenuItem("_Grayscale", "", () => SwitchTheme("grayscale")),
-                    new MenuItem("_Far Blue", "", () => SwitchTheme("far-blue")),
-                    new MenuItem("_Matrix Green", "", () => SwitchTheme("matrix"))
-                }),
+                new MenuBarItem("_Theme", ThemeProvider.GetThemeNames()
+                    .Select(name => new MenuItem(name, "", () => SwitchTheme(name)))
+                    .ToArray()),
                 new MenuBarItem("_Help", new MenuItem[]
                 {
                     new MenuItem("_About", "", () => ShowAbout())
