@@ -17,6 +17,14 @@ brew tap musukvl/azkv
 brew install azkv
 ```
 
+### .Net Tool
+
+The .net tool installation requires dotnet cli installed first [https://dotnet.microsoft.com/](https://dotnet.microsoft.com/en-us/download/dotnet/10.0).
+
+```bash
+dotnet tool install -g azkv
+```
+
 ### Direct Download
 
 You can also download the precompiled binaries directly from the [releases page](https://github.com/musukvl/azkv/releases).
