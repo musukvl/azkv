@@ -1,0 +1,198 @@
+using Terminal.Gui;
+using Terminal.Gui.App;
+using Terminal.Gui.Drawing;
+using Terminal.Gui.Drivers;
+using Terminal.Gui.ViewBase;
+using Terminal.Gui.Views;
+using AzureKvManager.Tui.Models;
+using AzureKvManager.Tui.ViewModels;
+using AzureKvManager.Tui.Views.Dialogs;
+
+namespace AzureKvManager.Tui.Views.Panels;
+
+public sealed class SecretDetailsPanel : View
+{
+    private readonly IApplication _app;
+    private readonly SecretDetailsViewModel _viewModel;
+    private readonly Button _copyButton;
+    private readonly TextView _contentTypeView;
+    private readonly Label _expirationLabel;
+    private readonly TextView _valueView;
+
+    public event Action? AddVersionRequested;
+    public event Action<string>? StatusChanged;
+
+    public FrameView ActionsFrame { get; }
+    public FrameView ContentTypeFrame { get; }
+    public FrameView ExpirationFrame { get; }
+    public FrameView ValueFrame { get; }
+
+    public SecretDetailsPanel(IApplication app, SecretDetailsViewModel viewModel)
+    {
+        _app = app;
+        _viewModel = viewModel;
+
+        ActionsFrame = new FrameView { Title = "Actions" };
+
+        var addVersionButton = new Button
+        {
+            Text = "New _Version",
+            X = 0,
+            Y = 0
+        };
+        addVersionButton.Accepting += (s, e) => AddVersionRequested?.Invoke();
+
+        _copyButton = new Button
+        {
+            Text = "Copy _Value",
+            X = Pos.Right(addVersionButton) + 1,
+            Y = 0,
+            Enabled = false
+        };
+        _copyButton.Accepting += (s, e) => CopySecretValue();
+
+        ActionsFrame.Add(addVersionButton, _copyButton);
+
+        ContentTypeFrame = new FrameView { Title = "Content Type" };
+
+        _contentTypeView = new TextView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            ReadOnly = true,
+            WordWrap = true,
+            SchemeName = "Base"
+        };
+
+        ApplyReadableTextScheme(_contentTypeView);
+        ContentTypeFrame.Add(_contentTypeView);
+
+        ExpirationFrame = new FrameView { Title = "Expiration Date" };
+
+        _expirationLabel = new Label
+        {
+            Text = "Expiration: (select a version)",
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill()
+        };
+
+        ExpirationFrame.Add(_expirationLabel);
+
+        ValueFrame = new FrameView { Title = "Secret Value" };
+
+        _valueView = new TextView
+        {
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            ReadOnly = true,
+            WordWrap = true,
+            SchemeName = "Base"
+        };
+
+        ApplyReadableTextScheme(_valueView);
+
+        _valueView.KeyDown += (s, e) =>
+        {
+            if (e.KeyCode == (KeyCode.C | KeyCode.CtrlMask) ||
+                e.KeyCode == (KeyCode.C | KeyCode.AltMask))
+            {
+                CopySecretValue();
+                e.Handled = true;
+            }
+        };
+
+        ValueFrame.Add(_valueView);
+
+        UpdateFromViewModel();
+    }
+
+    public void UpdateFromViewModel()
+    {
+        _contentTypeView.Text = _viewModel.ContentTypeText;
+        _expirationLabel.Text = _viewModel.ExpirationText;
+        _valueView.Text = _viewModel.ValueText;
+        _copyButton.Enabled = _viewModel.CanCopy;
+    }
+
+    public async Task LoadVersionDetailsAsync(string vaultName, string secretName, SecretVersion version)
+    {
+        var loadTask = _viewModel.LoadForVersionAsync(vaultName, secretName, version);
+
+        _app.Invoke(() =>
+        {
+            StatusChanged?.Invoke("Loading secret value...");
+            UpdateFromViewModel();
+        });
+
+        var loadResult = await loadTask;
+
+        _app.Invoke(() =>
+        {
+            if (loadResult.IsStale)
+            {
+                return;
+            }
+
+            UpdateFromViewModel();
+
+            if (!loadResult.Success)
+            {
+                var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
+                StatusChanged?.Invoke($"Error: {errorMessage}");
+                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {errorMessage}", "OK");
+                return;
+            }
+
+            var shortVer = version.Version.Length > 8 ? version.Version[..8] : version.Version;
+            StatusChanged?.Invoke($"Loaded value for {secretName} (version {shortVer}...)");
+        });
+    }
+
+    public void Clear(bool clearValue = true)
+    {
+        _viewModel.Clear(clearValue);
+        UpdateFromViewModel();
+    }
+
+    public void ApplyTheme()
+    {
+        ApplyReadableTextScheme(_contentTypeView);
+        ApplyReadableTextScheme(_valueView);
+    }
+
+    private void CopySecretValue()
+    {
+        if (!string.IsNullOrWhiteSpace(_viewModel.CopyableValue))
+        {
+            if (_app.Clipboard is null)
+            {
+                StatusChanged?.Invoke("Clipboard is not available.");
+                return;
+            }
+
+            _app.Clipboard.SetClipboardData(_viewModel.CopyableValue);
+            StatusChanged?.Invoke("Secret value copied to clipboard!");
+        }
+    }
+
+    private static void ApplyReadableTextScheme(TextView textView)
+    {
+        var currentScheme = textView.GetScheme();
+
+        if (currentScheme is null)
+        {
+            return;
+        }
+
+        textView.SetScheme(new Scheme(currentScheme)
+        {
+            Editable = currentScheme.Normal,
+            ReadOnly = currentScheme.Normal
+        });
+    }
+}

@@ -20,16 +20,23 @@ public sealed class MainWindowViewModel
 
     public SecretDetailsViewModel SecretDetails { get; }
 
-    public void ClearFromVaultSelection(string? vaultName = null)
+    public string? SelectedVaultName { get; private set; }
+
+    public string? SelectedSecretName { get; private set; }
+
+    public void SelectVault(string vaultName)
     {
-        Secrets.ClearForVaultSwitch(vaultName);
+        SelectedVaultName = vaultName;
+        SelectedSecretName = null;
+        Secrets.ClearForVaultSwitch();
         Versions.ClearForSecretSwitch();
         SecretDetails.Clear();
     }
 
-    public void ClearFromSecretSelection(string vaultName, string secretName)
+    public void SelectSecret(string secretName)
     {
-        Versions.ClearForSecretSwitch(vaultName, secretName);
+        SelectedSecretName = secretName;
+        Versions.ClearForSecretSwitch();
         SecretDetails.Clear();
     }
 }

@@ -1,315 +1,97 @@
 using Terminal.Gui;
 using Terminal.Gui.App;
-using Terminal.Gui.Drivers;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
-using System.Globalization;
 using AzureKvManager.Tui.Themes;
 using AzureKvManager.Tui.ViewModels;
+using AzureKvManager.Tui.Views.Dialogs;
+using AzureKvManager.Tui.Views.Panels;
 
 namespace AzureKvManager.Tui.Views;
 
-public partial class MainWindow : Window
+public class MainWindow : Window
 {
     private readonly IApplication _app;
     private readonly MainWindowViewModel _viewModel;
-    private TextField _keyVaultFilter;
-    private TextField _secretFilter;
-    private ListView _keyVaultsList;
-    private TableView _secretsTable;
-    private TableView _versionsTable;
-    private Button _copyButton;
-    private TextView _contentTypeView;
-    private Label _expirationLabel;
-    private TextView _valueView;
-    private Label _statusLabel;
-    private bool _suppressFilterEvents;
-    private bool _suppressVersionSelectionEvent;
+    private readonly KeyVaultsPanel _keyVaultsPanel;
+    private readonly SecretsPanel _secretsPanel;
+    private readonly VersionsPanel _versionsPanel;
+    private readonly SecretDetailsPanel _detailsPanel;
+    private readonly Label _statusLabel;
 
     public MainWindow(IApplication app, MainWindowViewModel viewModel, string? initialFilter = null)
     {
         _app = app ?? throw new ArgumentNullException(nameof(app));
         _viewModel = viewModel ?? throw new ArgumentNullException(nameof(viewModel));
-        
+
         Title = "Azure Key Vault Manager (TUI)";
-        
-        // Create menu bar
+
         var menu = new MenuBar
         {
             Menus =
             [
-                new ("_File", [
-                    new MenuItem("_Refresh All", "", RefreshKeyVaults),
+                new("_File", [
+                    new MenuItem("_Refresh All", "", () => _keyVaultsPanel!.RefreshKeyVaults()),
                     new MenuItem("_Quit", "", () => _app.RequestStop())
                 ]),
-                new ("_Theme", ThemeProvider.GetThemeNames()
+                new("_Theme", ThemeProvider.GetThemeNames()
                     .Select(name => new MenuItem(name, "", () => SwitchTheme(name)))
                     .ToArray()),
-                new ("_Help", [
+                new("_Help", [
                     new MenuItem("_About", "", ShowAbout)
                 ])
             ]
         };
-        
+
         Add(menu);
-        
-        // Create main layout
-        var keyVaultsFrame = new FrameView
+
+        _keyVaultsPanel = new KeyVaultsPanel(app, viewModel.KeyVaults)
         {
-            Title = "Key Vaults",
             X = 0,
             Y = 1,
             Width = Dim.Percent(25),
             Height = Dim.Fill(2)
         };
-        
-        var kvFilterLabel = new Label
-        {
-            Text = "Filter:",
-            X = 0,
-            Y = 0,
-            Width = 7
-        };
-        
-        _keyVaultFilter = new TextField
-        {
-            X = Pos.Right(kvFilterLabel),
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = 1
-        };
-        _keyVaultFilter.TextChanged += (s, e) =>
-        {
-            if (_suppressFilterEvents)
-            {
-                return;
-            }
 
-            FilterKeyVaults();
-        };
-        
-        _keyVaultsList = new ListView
+        _secretsPanel = new SecretsPanel(app, viewModel.Secrets)
         {
-            X = 0,
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = Dim.Fill()
-        };
-        
-        _keyVaultsList.ValueChanged += OnKeyVaultSelectionChanged;
-        keyVaultsFrame.Add(_keyVaultFilter, kvFilterLabel, _keyVaultsList);
-        
-        var secretsFrame = new FrameView
-        {
-            Title = "Secrets",
-            X = Pos.Right(keyVaultsFrame),
+            X = Pos.Right(_keyVaultsPanel),
             Y = 1,
             Width = Dim.Percent(40),
             Height = Dim.Fill(2)
         };
-        
-        var secretFilterLabel = new Label
-        {
-            Text = "Filter:",
-            X = 0,
-            Y = 0,
-            Width = 7
-        };
-        
-        _secretFilter = new TextField
-        {
-            X = Pos.Right(secretFilterLabel),
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = 1
-        };
-        _secretFilter.TextChanged += (s, e) =>
-        {
-            if (_suppressFilterEvents)
-            {
-                return;
-            }
 
-            FilterSecrets();
-        };
-        
-        _secretsTable = new TableView
+        _versionsPanel = new VersionsPanel(app, viewModel.Versions)
         {
-            X = 0,
-            Y = 1,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(1)
-        };
-
-        _secretsTable.FullRowSelect = true;
-        _secretsTable.MultiSelect = false;
-        _secretsTable.Style.ShowVerticalCellLines = false;
-        _secretsTable.Style.ShowVerticalHeaderLines = false;
-        _secretsTable.Style.ShowHeaders = false;
-        _secretsTable.Style.ExpandLastColumn = true;
-        _secretsTable.Style.ShowHorizontalHeaderOverline = false;
-        _secretsTable.Style.ShowHorizontalHeaderUnderline = false;
-
-        SetSecretsTableSource([]);
-        _secretsTable.SelectedCellChanged += OnSecretSelectionChanged;
-        
-        var addSecretButton = new Button
-        {
-            Text = "New _Secret",
-            X = 0,
-            Y = Pos.Bottom(_secretsTable)
-        };
-        addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
-
-        var reloadSecretsButton = new Button
-        {
-            Text = "_Reload",
-            X = Pos.Right(addSecretButton) + 1,
-            Y = Pos.Bottom(_secretsTable)
-        };
-        reloadSecretsButton.Accepting += async (s, e) => await ReloadSecrets();
-
-        secretsFrame.Add(_secretFilter, secretFilterLabel, _secretsTable, addSecretButton, reloadSecretsButton);
-        
-        var versionsFrame = new FrameView
-        {
-            Title = "Secret Versions",
-            X = Pos.Right(secretsFrame),
+            X = Pos.Right(_secretsPanel),
             Y = 1,
             Width = Dim.Fill(),
             Height = Dim.Percent(35)
         };
-        
-        _versionsTable = new TableView
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill()
-        };
 
-        _versionsTable.FullRowSelect = true;
-        _versionsTable.MultiSelect = false;
-        _versionsTable.Style.ShowVerticalCellLines = false;
-        _versionsTable.Style.ShowVerticalHeaderLines = false;
-        _versionsTable.Style.ExpandLastColumn = true;
+        _detailsPanel = new SecretDetailsPanel(app, viewModel.SecretDetails);
 
-        SetVersionsTableSource(_viewModel.Versions.Versions);
-        
-        _versionsTable.SelectedCellChanged += OnVersionSelectionChanged;
+        _detailsPanel.ActionsFrame.X = Pos.Right(_secretsPanel);
+        _detailsPanel.ActionsFrame.Y = Pos.Bottom(_versionsPanel);
+        _detailsPanel.ActionsFrame.Width = Dim.Fill();
+        _detailsPanel.ActionsFrame.Height = 3;
 
-        versionsFrame.Add(_versionsTable);
+        _detailsPanel.ContentTypeFrame.X = Pos.Right(_secretsPanel);
+        _detailsPanel.ContentTypeFrame.Y = Pos.Bottom(_detailsPanel.ActionsFrame);
+        _detailsPanel.ContentTypeFrame.Width = Dim.Fill();
+        _detailsPanel.ContentTypeFrame.Height = Dim.Percent(15);
 
-        var actionsFrame = new FrameView
-        {
-            Title = "Actions",
-            X = Pos.Right(secretsFrame),
-            Y = Pos.Bottom(versionsFrame),
-            Width = Dim.Fill(),
-            Height = 3
-        };
-        
-        var addVersionButton = new Button
-        {
-            Text = "New _Version",
-            X = 0,
-            Y = 0
-        };
-        addVersionButton.Accepting += (s, e) => ShowAddVersionDialog();
-        
-        _copyButton = new Button
-        {
-            Text = "Copy _Value",
-            X = Pos.Right(addVersionButton) + 1,
-            Y = 0,
-            Enabled = false
-        };
-        _copyButton.Accepting += (s, e) => CopySecretValue();
+        _detailsPanel.ExpirationFrame.X = Pos.Right(_secretsPanel);
+        _detailsPanel.ExpirationFrame.Y = Pos.Bottom(_detailsPanel.ContentTypeFrame);
+        _detailsPanel.ExpirationFrame.Width = Dim.Fill();
+        _detailsPanel.ExpirationFrame.Height = 3;
 
-        actionsFrame.Add(addVersionButton, _copyButton);
+        _detailsPanel.ValueFrame.X = Pos.Right(_secretsPanel);
+        _detailsPanel.ValueFrame.Y = Pos.Bottom(_detailsPanel.ExpirationFrame);
+        _detailsPanel.ValueFrame.Width = Dim.Fill();
+        _detailsPanel.ValueFrame.Height = Dim.Fill(2);
 
-        var contentTypeFrame = new FrameView
-        {
-            Title = "Content Type",
-            X = Pos.Right(secretsFrame),
-            Y = Pos.Bottom(actionsFrame),
-            Width = Dim.Fill(),
-            Height = Dim.Percent(15)
-        };
-
-        _contentTypeView = new TextView
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            ReadOnly = true,
-            WordWrap = true,
-            SchemeName = "Base"
-        };
-
-        ApplyReadableTextScheme(_contentTypeView);
-
-        contentTypeFrame.Add(_contentTypeView);
-
-        var expirationFrame = new FrameView
-        {
-            Title = "Expiration Date",
-            X = Pos.Right(secretsFrame),
-            Y = Pos.Bottom(contentTypeFrame),
-            Width = Dim.Fill(),
-            Height = 3
-        };
-
-        _expirationLabel = new Label
-        {
-            Text = "Expiration: (select a version)",
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill()
-        };
-
-        expirationFrame.Add(_expirationLabel);
-        
-        var valueFrame = new FrameView
-        {
-            Title = "Secret Value",
-            X = Pos.Right(secretsFrame),
-            Y = Pos.Bottom(expirationFrame),
-            Width = Dim.Fill(),
-            Height = Dim.Fill(2)
-        };
-        
-        _valueView = new TextView
-        {
-            X = 0,
-            Y = 0,
-            Width = Dim.Fill(),
-            Height = Dim.Fill(),
-            ReadOnly = true,
-            WordWrap = true,
-            SchemeName = "Base"
-        };
-
-        ApplyReadableTextScheme(_valueView);
-        
-        _valueView.KeyDown += (s, e) =>
-        {
-            // Ctrl+C for copy (also works on Mac as terminals often translate Cmd+C to Ctrl+C)
-            // Alt+C as alternative for Mac users
-            if (e.KeyCode == (KeyCode.C | KeyCode.CtrlMask) || 
-                e.KeyCode == (KeyCode.C | KeyCode.AltMask))
-            {
-                CopySecretValue();
-                e.Handled = true;
-            }
-        };
-        
-        valueFrame.Add(_valueView);
-
-        ApplySecretDetailsToView();
-        
         _statusLabel = new Label
         {
             Text = "Loading Key Vaults...",
@@ -317,39 +99,134 @@ public partial class MainWindow : Window
             Y = Pos.AnchorEnd(1),
             Width = Dim.Fill()
         };
-        
-        Add(keyVaultsFrame, secretsFrame, versionsFrame, actionsFrame, contentTypeFrame, expirationFrame, valueFrame, _statusLabel);
-        
-        // Apply initial filter if provided
+
+        Add(_keyVaultsPanel, _secretsPanel, _versionsPanel,
+            _detailsPanel.ActionsFrame, _detailsPanel.ContentTypeFrame,
+            _detailsPanel.ExpirationFrame, _detailsPanel.ValueFrame,
+            _statusLabel);
+
+        // Wire events
+        _keyVaultsPanel.KeyVaultSelected += OnKeyVaultSelected;
+        _keyVaultsPanel.StatusChanged += UpdateStatus;
+
+        _secretsPanel.SecretSelected += OnSecretSelected;
+        _secretsPanel.StatusChanged += UpdateStatus;
+
+        _versionsPanel.VersionSelected += OnVersionSelected;
+        _versionsPanel.StatusChanged += UpdateStatus;
+
+        _detailsPanel.AddVersionRequested += OnAddVersionRequested;
+        _detailsPanel.StatusChanged += UpdateStatus;
+
+        // Apply initial filter
         if (!string.IsNullOrEmpty(initialFilter))
         {
-            _suppressFilterEvents = true;
-            _keyVaultFilter.Text = initialFilter;
-            _suppressFilterEvents = false;
+            _keyVaultsPanel.SetInitialFilter(initialFilter);
         }
-        
+
         // Load key vaults on startup
-        Task.Run(RefreshKeyVaults);
+        Task.Run(() => _keyVaultsPanel.RefreshKeyVaults());
     }
 
-    private void CopySecretValue()
+    private void OnKeyVaultSelected(KeyVault keyVault)
     {
-        if (!string.IsNullOrWhiteSpace(_viewModel.SecretDetails.CopyableValue))
-        {
-            if (_app.Clipboard is null)
-            {
-                _statusLabel.Text = "Clipboard is not available.";
-                return;
-            }
+        _viewModel.SelectVault(keyVault.Name);
 
-            _app.Clipboard.SetClipboardData(_viewModel.SecretDetails.CopyableValue);
-            _statusLabel.Text = "Secret value copied to clipboard!";
+        _secretsPanel.Clear();
+        _versionsPanel.Clear();
+        _detailsPanel.Clear();
+
+        _ = _secretsPanel.LoadForVaultAsync(keyVault.Name);
+    }
+
+    private void OnSecretSelected(Secret secret)
+    {
+        _viewModel.SelectSecret(secret.Name);
+
+        _versionsPanel.Clear();
+        _detailsPanel.Clear();
+
+        if (_viewModel.SelectedVaultName is not null)
+        {
+            _ = _versionsPanel.LoadForSecretAsync(_viewModel.SelectedVaultName, secret.Name);
         }
+    }
+
+    private void OnVersionSelected(SecretVersion version)
+    {
+        if (_viewModel.SelectedVaultName is null || _viewModel.SelectedSecretName is null)
+        {
+            return;
+        }
+
+        _ = _detailsPanel.LoadVersionDetailsAsync(_viewModel.SelectedVaultName, _viewModel.SelectedSecretName, version);
+    }
+
+    private void OnAddVersionRequested()
+    {
+        if (_viewModel.SelectedVaultName is null)
+        {
+            MessageBox.ErrorQuery(_app, "Error", "Please select a Key Vault first", "OK");
+            return;
+        }
+
+        if (_viewModel.SelectedSecretName is null)
+        {
+            MessageBox.ErrorQuery(_app, "Error", "Please select a secret first", "OK");
+            return;
+        }
+
+        var dialog = new AddVersionDialog(_app, _viewModel.SelectedSecretName);
+        _app.Run(dialog);
+
+        if (dialog.Result is null)
+        {
+            return;
+        }
+
+        _ = CreateVersionAsync(dialog.Result);
+    }
+
+    private async Task CreateVersionAsync(AddVersionResult addResult)
+    {
+        var vaultName = _viewModel.SelectedVaultName;
+        var secretName = _viewModel.SelectedSecretName;
+        if (vaultName is null || secretName is null) return;
+
+        _app.Invoke(() => UpdateStatus($"Creating new version for '{secretName}'..."));
+
+        var result = await _viewModel.Versions.CreateVersionAsync(vaultName, secretName, addResult.Value, addResult.ContentType, addResult.ExpiresAt);
+
+        if (result.Success)
+        {
+            _app.Invoke(() =>
+            {
+                UpdateStatus($"New version created for '{secretName}'");
+                MessageBox.Query(_app, "Success", $"New version of '{secretName}' has been created successfully!", "OK");
+            });
+
+            await _versionsPanel.RefreshAsync(vaultName, secretName);
+            return;
+        }
+
+        _app.Invoke(() =>
+        {
+            var errorMessage = result.ErrorMessage ?? $"Failed to create new version for '{secretName}'";
+            UpdateStatus($"Error: {errorMessage}");
+            MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {errorMessage}", "OK");
+        });
+    }
+
+    private void SwitchTheme(string themeName)
+    {
+        ThemeProvider.ApplyTheme(themeName);
+        _detailsPanel.ApplyTheme();
+        SetNeedsDraw();
     }
 
     private void ShowAbout()
     {
-        MessageBox.Query(_app, "About", 
+        MessageBox.Query(_app, "About",
             "Azure Key Vault Manager (TUI)\n\n" +
             "A Terminal UI application for managing Azure Key Vaults\n" +
             "Built with Terminal.Gui\n\n" +
@@ -359,77 +236,12 @@ public partial class MainWindow : Window
             "- Arrow keys: Navigate within lists\n" +
             "- Enter: Select item\n" +
             "- Ctrl+C / Alt+C: Copy secret value\n" +
-            "- Ctrl+Q / Alt+F4: Quit", 
+            "- Ctrl+Q / Alt+F4: Quit",
             "OK");
     }
 
-    private void SetVersionsTableSource(IEnumerable<SecretVersion> versions)
+    private void UpdateStatus(string message)
     {
-        var snapshot = versions.ToArray();
-
-        _versionsTable.Table = new EnumerableTableSource<SecretVersion>(
-            snapshot,
-            new Dictionary<string, Func<SecretVersion, object>>
-            {
-                ["Version"] = version => ShortVersion(version.Version),
-                ["Created"] = version => FormatVersionDate(version.Created),
-                ["Expires"] = version => FormatVersionDate(version.Expires)
-            }
-        );
-
-        _versionsTable.Update();
-    }
-
-    private static string ShortVersion(string version)
-    {
-        if (string.IsNullOrWhiteSpace(version))
-        {
-            return " ";
-        }
-
-        return version.Substring(0, Math.Min(8, version.Length));
-    }
-
-    private static string FormatVersionDate(DateTime? dateTime)
-    {
-        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? " ";
-    }
-
-    private void SwitchTheme(string themeName)
-    {
-        ThemeProvider.ApplyTheme(themeName);
-        ApplyReadableTextScheme(_contentTypeView);
-        ApplyReadableTextScheme(_valueView);
-        SetNeedsDraw();
-    }
-
-    private static void ApplyReadableTextScheme(TextView textView)
-    {
-        var currentScheme = textView.GetScheme();
-
-        if (currentScheme is null)
-        {
-            return;
-        }
-
-        textView.SetScheme(new Terminal.Gui.Drawing.Scheme(currentScheme)
-        {
-            Editable = currentScheme.Normal,
-            ReadOnly = currentScheme.Normal
-        });
-    }
-
-    private void ClearVersionSelectionDetails(bool clearValue = true)
-    {
-        _viewModel.SecretDetails.Clear(clearValue);
-        ApplySecretDetailsToView();
-    }
-
-    private void ApplySecretDetailsToView()
-    {
-        _contentTypeView.Text = _viewModel.SecretDetails.ContentTypeText;
-        _expirationLabel.Text = _viewModel.SecretDetails.ExpirationText;
-        _valueView.Text = _viewModel.SecretDetails.ValueText;
-        _copyButton.Enabled = _viewModel.SecretDetails.CanCopy;
+        _statusLabel.Text = message;
     }
 }

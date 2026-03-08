@@ -9,7 +9,7 @@ public sealed class SecretsViewModel
     private readonly IAzureKeyVaultDataService _dataService;
     private List<Secret> _allSecrets = [];
     private List<Secret> _filteredSecrets = [];
-    private long _loadVersion;
+    private long _loadGeneration;
 
     public SecretsViewModel(IAzureKeyVaultDataService dataService)
     {
@@ -24,30 +24,26 @@ public sealed class SecretsViewModel
 
     public string FilterText { get; private set; } = string.Empty;
 
-    public string? CurrentVaultName { get; private set; }
-
-    public void ClearForVaultSwitch(string? vaultName = null)
+    public void ClearForVaultSwitch()
     {
-        CurrentVaultName = vaultName;
         SelectedSecret = null;
         FilterText = string.Empty;
         _allSecrets = [];
         _filteredSecrets = [];
-        Interlocked.Increment(ref _loadVersion);
+        Interlocked.Increment(ref _loadGeneration);
     }
 
     public async Task<OperationResult> LoadForVaultAsync(string vaultName)
     {
-        CurrentVaultName = vaultName;
         SelectedSecret = null;
 
-        var requestVersion = Interlocked.Increment(ref _loadVersion);
+        var requestGeneration = Interlocked.Increment(ref _loadGeneration);
 
         try
         {
             var loadedSecrets = await _dataService.GetSecretsAsync(vaultName);
 
-            if (requestVersion != Volatile.Read(ref _loadVersion) || CurrentVaultName != vaultName)
+            if (requestGeneration != Volatile.Read(ref _loadGeneration))
             {
                 return OperationResult.Stale();
             }
@@ -102,26 +98,16 @@ public sealed class SecretsViewModel
         return true;
     }
 
-    public async Task<OperationResult> RefreshAsync()
+    public async Task<OperationResult> RefreshAsync(string vaultName)
     {
-        if (string.IsNullOrWhiteSpace(CurrentVaultName))
-        {
-            return OperationResult.Ok();
-        }
-
-        return await LoadForVaultAsync(CurrentVaultName);
+        return await LoadForVaultAsync(vaultName);
     }
 
-    public async Task<OperationResult> CreateSecretAsync(string name, string value, string? contentType, DateTime? expiresAt)
+    public async Task<OperationResult> CreateSecretAsync(string vaultName, string name, string value, string? contentType, DateTime? expiresAt)
     {
-        if (string.IsNullOrWhiteSpace(CurrentVaultName))
-        {
-            return OperationResult.Fail("Please select a Key Vault first");
-        }
-
         try
         {
-            var success = await _dataService.SetSecretAsync(CurrentVaultName, name, value, contentType, expiresAt);
+            var success = await _dataService.SetSecretAsync(vaultName, name, value, contentType, expiresAt);
             return success
                 ? OperationResult.Ok()
                 : OperationResult.Fail($"Failed to create secret '{name}'");
