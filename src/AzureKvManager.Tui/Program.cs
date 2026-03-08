@@ -4,59 +4,41 @@ using AzureKvManager.Tui.Services;
 using AzureKvManager.Tui.ViewModels;
 using AzureKvManager.Tui.Themes;
 using Spectre.Console;
+using Spectre.Console.Cli;
 
 namespace AzureKvManager.Tui;
 
 class Program
 {
-    static void Main(string[] args)
+    static int Main(string[] args)
     {
-        // Check for help flag first
         if (args.Length > 0 && (args[0] == "--help" || args[0] == "-h"))
         {
             ShowHelp();
-            return;
+            return 0;
         }
-        
-        string? subscription = null;
-        string? filter = null;
-        string? themeName = null;
 
-        // Parse command-line arguments
-        for (int i = 0; i < args.Length; i++)
+        var app = new CommandApp<LaunchCommand>();
+        app.Configure(config =>
         {
-            if (args[i] == "-s" || args[i] == "--subscription")
-            {
-                if (i + 1 < args.Length)
-                {
-                    subscription = args[++i];
-                }
-            }
-            else if (args[i] == "-t" || args[i] == "--theme")
-            {
-                if (i + 1 < args.Length)
-                {
-                    themeName = args[++i];
-                }
-            }
-            else if (!args[i].StartsWith("-"))
-            {
-                // First non-option argument is the filter
-                filter = args[i];
-            }
-        }
+            config.SetApplicationName("azkv");
+        });
 
-        // Change Azure subscription if specified
+        return app.Run(args);
+    }
+
+    static int RunApplication(string? subscription, string? themeName, string? filter)
+    {
         if (!string.IsNullOrEmpty(subscription))
         {
             var subscriptionService = new SubscriptionService();
             if (!subscriptionService.TrySetSubscription(subscription, out var errorMessage))
             {
                 AnsiConsole.MarkupLine($"[red]Failed to switch subscription:[/] {errorMessage}");
-                return;
+                return 1;
             }
         }
-        
+
         var azureService = new AzureCliService();
         var mainWindowViewModel = new MainWindowViewModel(azureService);
 
@@ -72,6 +54,28 @@ class Program
 
         using var mainWindow = new MainWindow(app, mainWindowViewModel, filter);
         app.Run(mainWindow);
+
+        return 0;
+    }
+
+    sealed class LaunchCommand : Command<LaunchSettings>
+    {
+        public override int Execute(CommandContext context, LaunchSettings settings, CancellationToken cancellationToken)
+        {
+            return RunApplication(settings.Subscription, settings.ThemeName, settings.Filter);
+        }
+    }
+
+    sealed class LaunchSettings : CommandSettings
+    {
+        [CommandOption("-s|--subscription <NAME>")]
+        public string? Subscription { get; set; }
+
+        [CommandOption("-t|--theme <NAME>")]
+        public string? ThemeName { get; set; }
+
+        [CommandArgument(0, "[FILTER]")]
+        public string? Filter { get; set; }
     }
     
     static void ShowHelp()
