@@ -19,6 +19,9 @@ Workflow:
 - Create `releases/v<version>.md` in the same style as previous release notes.
 - Include user-facing changes, install/update instructions, and direct download links for `v<version>` artifacts.
 
+2.1 Update versions in csproj files:
+- Update version-releated properties in all `*.csproj` files to `<version>`.
+
 3. Commit and push release source commit:
 - Add and commit `releases/v<version>.md` on `main`.
 - If `releases/` is ignored, use force add for that file only.
