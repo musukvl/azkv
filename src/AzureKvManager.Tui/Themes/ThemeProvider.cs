@@ -13,9 +13,7 @@ public static class ThemeProvider
     {
         return ThemeManager.GetThemeNames();
     }
-
-    public static string CurrentThemeName => ThemeManager.Theme;
-
+    
     public static void ApplyTheme(string themeName)
     {
         ThemeManager.Theme = themeName;

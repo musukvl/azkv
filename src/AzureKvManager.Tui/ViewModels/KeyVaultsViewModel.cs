@@ -55,8 +55,7 @@ public sealed class KeyVaultsViewModel
                 .ToList();
         }
 
-        if (SelectedKeyVault is not null &&
-            !_filteredKeyVaults.Any(kv => kv.Name == SelectedKeyVault.Name))
+        if (SelectedKeyVault is not null && _filteredKeyVaults.All(kv => kv.Name != SelectedKeyVault.Name))
         {
             SelectedKeyVault = null;
         }

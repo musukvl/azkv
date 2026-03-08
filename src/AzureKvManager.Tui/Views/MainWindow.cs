@@ -37,21 +37,19 @@ public partial class MainWindow : Window
         // Create menu bar
         var menu = new MenuBar
         {
-            Menus = new MenuBarItem[]
-            {
-                new MenuBarItem("_File", new MenuItem[]
-                {
-                    new MenuItem("_Refresh All", "", () => RefreshKeyVaults()),
+            Menus =
+            [
+                new ("_File", [
+                    new MenuItem("_Refresh All", "", RefreshKeyVaults),
                     new MenuItem("_Quit", "", () => _app.RequestStop())
-                }),
-                new MenuBarItem("_Theme", ThemeProvider.GetThemeNames()
+                ]),
+                new ("_Theme", ThemeProvider.GetThemeNames()
                     .Select(name => new MenuItem(name, "", () => SwitchTheme(name)))
                     .ToArray()),
-                new MenuBarItem("_Help", new MenuItem[]
-                {
-                    new MenuItem("_About", "", () => ShowAbout())
-                })
-            }
+                new ("_Help", [
+                    new MenuItem("_About", "", ShowAbout)
+                ])
+            ]
         };
         
         Add(menu);

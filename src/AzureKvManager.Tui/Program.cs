@@ -1,4 +1,3 @@
-using Terminal.Gui;
 using Terminal.Gui.App;
 using AzureKvManager.Tui.Views;
 using AzureKvManager.Tui.Services;
