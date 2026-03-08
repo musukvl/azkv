@@ -7,14 +7,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
 
-    <!-- Versioning -->
-    <Version>1.0.4</Version>
-    <AssemblyVersion>1.0.4</AssemblyVersion>
-    <FileVersion>1.0.4</FileVersion>
-    <InformationalVersion>1.0.4</InformationalVersion>
-
     <!-- Dotnet tool -->
-    <PackAsTool>true</PackAsTool>
     <ToolCommandName>azkv</ToolCommandName>
     <PackageId>azkv</PackageId>
     <Description>TUI for managing Azure Key Vault secrets</Description>

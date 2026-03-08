@@ -91,13 +91,13 @@ class Program
         AnsiConsole.WriteLine();
         
         AnsiConsole.MarkupLine("[bold]OPTIONS:[/]");
-        AnsiConsole.MarkupLine("  [cyan]-s, --subscription[/] [grey]<NAME>[/]     Switch to the specified Azure subscription");
-        AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]            Set color theme (e.g. Dark, Light, \"Amber Phosphor\")");
-        AnsiConsole.MarkupLine("  [cyan]-h, --help[/]                          Show this help message");
+        AnsiConsole.MarkupLine("  [cyan]-s, --subscription[/] [grey]<NAME>[/]   Switch to the specified Azure subscription");
+        AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]          Set color theme (e.g. Dark, Light, \"Amber Phosphor\")");
+        AnsiConsole.MarkupLine("  [cyan]-h, --help[/]                           Show this help message");
         AnsiConsole.WriteLine();
         
         AnsiConsole.MarkupLine("[bold]ARGUMENTS:[/]");
-        AnsiConsole.MarkupLine("  [cyan]FILTER[/]                        Initial filter text for Key Vault list");
+        AnsiConsole.MarkupLine("  [cyan]FILTER[/]                  Initial filter text for Key Vault list");
         AnsiConsole.WriteLine();
         
         AnsiConsole.MarkupLine("[bold]EXAMPLES:[/]");
@@ -106,7 +106,7 @@ class Program
         AnsiConsole.MarkupLine("  azurekv -s my-subscription       Switch subscription before launching");
         AnsiConsole.MarkupLine("  azurekv -s my-sub prod           Switch subscription and filter by 'prod'");
         AnsiConsole.MarkupLine("  azurekv -t Dark                  Launch with Dark theme");
-        AnsiConsole.MarkupLine("  azurekv -t \"Amber Phosphor\"      Launch with Amber Phosphor theme");
+        AnsiConsole.MarkupLine("  azurekv -t \"Amber Phosphor\"    Launch with Amber Phosphor theme");
         AnsiConsole.WriteLine();
         
         AnsiConsole.MarkupLine("[bold]NAVIGATION:[/]");

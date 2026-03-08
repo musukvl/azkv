@@ -22,6 +22,9 @@ if [ $# -ne 1 ]; then
 fi
 
 VERSION=$1
+ASSEMBLY_VERSION="${VERSION}.0"
+FILE_VERSION="$ASSEMBLY_VERSION"
+INFORMATIONAL_VERSION="$VERSION"
 
 if [ -z "$NUGET_API_KEY" ]; then
     echo -e "${RED}Error: NUGET_API_KEY environment variable is not set${NC}"
@@ -33,13 +36,18 @@ echo -e "${GREEN}azkv - Publish dotnet tool to NuGet${NC}"
 echo -e "${GREEN}========================================${NC}"
 echo ""
 echo -e "Version: ${YELLOW}${VERSION}${NC}"
+echo -e "AssemblyVersion/FileVersion: ${YELLOW}${ASSEMBLY_VERSION}${NC}"
 echo ""
 
 # Pack
 echo -e "${GREEN}Packing dotnet tool...${NC}"
 dotnet pack src/AzureKvManager.Tui/AzureKvManager.Tui.csproj \
     -c Release \
+    -p:PackAsTool=true \
     -p:Version=${VERSION} \
+    -p:AssemblyVersion=${ASSEMBLY_VERSION} \
+    -p:FileVersion=${FILE_VERSION} \
+    -p:InformationalVersion=${INFORMATIONAL_VERSION} \
     -o ./publish/nuget
 
 echo ""
@@ -58,7 +66,7 @@ fi
 # Push
 echo -e "${GREEN}Pushing to NuGet...${NC}"
 dotnet nuget push ./publish/nuget/azkv.${VERSION}.nupkg \
-    --api-key $NUGET_API_KEY \
+    --api-key "$NUGET_API_KEY" \
     --source https://api.nuget.org/v3/index.json
 
 echo ""
