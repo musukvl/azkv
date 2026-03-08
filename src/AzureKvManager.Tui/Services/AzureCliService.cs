@@ -20,7 +20,7 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<List<KeyVault>> GetAllKeyVaultsAsync()
     {
-        var result = await ExecuteAzCliCommandAsync("az keyvault list");
+        var result = await ExecuteAzCliCommandAsync("keyvault", "list");
         
         if (string.IsNullOrWhiteSpace(result))
             return [];
@@ -44,7 +44,7 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<List<Secret>> GetSecretsAsync(string keyVaultName)
     {
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret list --vault-name {keyVaultName}");
+        var result = await ExecuteAzCliCommandAsync("keyvault", "secret", "list", "--vault-name", keyVaultName);
         
         if (string.IsNullOrWhiteSpace(result))
             return [];
@@ -71,7 +71,7 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<List<SecretVersion>> GetSecretVersionsAsync(string keyVaultName, string secretName)
     {
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret list-versions --vault-name {keyVaultName} --name {secretName}");
+        var result = await ExecuteAzCliCommandAsync("keyvault", "secret", "list-versions", "--vault-name", keyVaultName, "--name", secretName);
         
         if (string.IsNullOrWhiteSpace(result))
             return [];
@@ -97,8 +97,14 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<string?> GetSecretValueAsync(string keyVaultName, string secretName, string? version = null)
     {
-        var versionParam = string.IsNullOrWhiteSpace(version) ? "" : $" --version {version}";
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret show --vault-name {keyVaultName} --name {secretName}{versionParam}");
+        var args = new List<string> { "keyvault", "secret", "show", "--vault-name", keyVaultName, "--name", secretName };
+        if (!string.IsNullOrWhiteSpace(version))
+        {
+            args.Add("--version");
+            args.Add(version);
+        }
+
+        var result = await ExecuteAzCliCommandAsync(args.ToArray());
         
         if (string.IsNullOrWhiteSpace(result))
             return null;
@@ -116,7 +122,7 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<SecretVersion?> GetSecretVersionDetailsAsync(string keyVaultName, string secretName, string version)
     {
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret show --vault-name {keyVaultName} --name {secretName} --version {version}");
+        var result = await ExecuteAzCliCommandAsync("keyvault", "secret", "show", "--vault-name", keyVaultName, "--name", secretName, "--version", version);
 
         if (string.IsNullOrWhiteSpace(result))
             return null;
@@ -149,9 +155,20 @@ public class AzureCliService : IAzureKeyVaultDataService
 
     public async Task<bool> SetSecretAsync(string keyVaultName, string secretName, string value, string? contentType = null, DateTime? expires = null)
     {
-        var contentTypeParam = string.IsNullOrWhiteSpace(contentType) ? "" : $" --content-type \"{contentType}\"";
-        var expiresParam = expires.HasValue ? $" --expires \"{FormatAzUtcDateTime(expires.Value)}\"" : "";
-        var result = await ExecuteAzCliCommandAsync($"az keyvault secret set --vault-name {keyVaultName} --name {secretName} --value \"{value}\"{contentTypeParam}{expiresParam}");
+        var args = new List<string> { "keyvault", "secret", "set", "--vault-name", keyVaultName, "--name", secretName, "--value", value };
+        if (!string.IsNullOrWhiteSpace(contentType))
+        {
+            args.Add("--content-type");
+            args.Add(contentType);
+        }
+
+        if (expires.HasValue)
+        {
+            args.Add("--expires");
+            args.Add(FormatAzUtcDateTime(expires.Value));
+        }
+
+        var result = await ExecuteAzCliCommandAsync(args.ToArray());
         
         return !string.IsNullOrWhiteSpace(result);
     }
@@ -165,34 +182,35 @@ public class AzureCliService : IAzureKeyVaultDataService
         return utc.ToString("yyyy-MM-ddTHH:mm:ssZ");
     }
 
-    private async Task<string> ExecuteAzCliCommandAsync(string command)
+    private async Task<string> ExecuteAzCliCommandAsync(params string[] arguments)
     {
         try
         {
             var processStartInfo = new ProcessStartInfo
             {
-                FileName = "/bin/bash",
-                Arguments = $"-c \"{command}\"",
+                FileName = "az",
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true
             };
 
-            // For Windows, use cmd instead
-            if (OperatingSystem.IsWindows())
+            foreach (var arg in arguments)
             {
-                processStartInfo.FileName = "cmd.exe";
-                processStartInfo.Arguments = $"/c {command}";
+                processStartInfo.ArgumentList.Add(arg);
             }
 
             using var process = new Process { StartInfo = processStartInfo };
             process.Start();
 
-            var output = await process.StandardOutput.ReadToEndAsync();
-            var error = await process.StandardError.ReadToEndAsync();
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            await Task.WhenAll(outputTask, errorTask);
 
             await process.WaitForExitAsync();
+
+            var output = outputTask.Result;
+            var error = errorTask.Result;
 
             if (process.ExitCode != 0)
             {

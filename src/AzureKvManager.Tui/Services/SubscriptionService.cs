@@ -17,19 +17,16 @@ public sealed class SubscriptionService
         {
             var processInfo = new ProcessStartInfo
             {
-                FileName = "/bin/bash",
-                Arguments = $"-c \"az account set --subscription '{subscription}'\"",
+                FileName = "az",
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 CreateNoWindow = true
             };
-
-            if (OperatingSystem.IsWindows())
-            {
-                processInfo.FileName = "cmd.exe";
-                processInfo.Arguments = $"/c az account set --subscription \"{subscription}\"";
-            }
+            processInfo.ArgumentList.Add("account");
+            processInfo.ArgumentList.Add("set");
+            processInfo.ArgumentList.Add("--subscription");
+            processInfo.ArgumentList.Add(subscription);
 
             using var process = Process.Start(processInfo);
             if (process is null)
