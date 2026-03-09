@@ -7,13 +7,15 @@ namespace AzureKvManager.Tui.ViewModels;
 public sealed class SecretDetailsViewModel
 {
     private readonly IAzureKeyVaultDataService _dataService;
-    private long _loadVersion;
+    private long _loadGeneration;
 
     public SecretDetailsViewModel(IAzureKeyVaultDataService dataService)
     {
         _dataService = dataService;
         Clear();
     }
+
+    public event Action? StateChanged;
 
     public string ValueText { get; private set; } = string.Empty;
 
@@ -29,7 +31,7 @@ public sealed class SecretDetailsViewModel
 
     public void Clear(bool clearValue = true)
     {
-        Interlocked.Increment(ref _loadVersion);
+        Interlocked.Increment(ref _loadGeneration);
         SelectedVersionId = null;
         ContentTypeText = string.Empty;
         ExpirationText = "Expiration: (select a version)";
@@ -39,6 +41,8 @@ public sealed class SecretDetailsViewModel
         {
             ValueText = string.Empty;
         }
+
+        StateChanged?.Invoke();
     }
 
     public async Task<OperationResult> LoadForVersionAsync(string vaultName, string secretName, SecretVersion selectedVersion)
@@ -49,13 +53,15 @@ public sealed class SecretDetailsViewModel
         ValueText = "Loading...";
         CopyableValue = null;
 
-        var requestVersion = Interlocked.Increment(ref _loadVersion);
+        StateChanged?.Invoke();
+
+        var requestGeneration = Interlocked.Increment(ref _loadGeneration);
 
         try
         {
             var details = await _dataService.GetSecretVersionDetailsAsync(vaultName, secretName, selectedVersion.Version);
 
-            if (requestVersion != Volatile.Read(ref _loadVersion) || SelectedVersionId != selectedVersion.Version)
+            if (requestGeneration != Volatile.Read(ref _loadGeneration) || SelectedVersionId != selectedVersion.Version)
             {
                 return OperationResult.Stale();
             }
@@ -69,17 +75,22 @@ public sealed class SecretDetailsViewModel
             ValueText = resolvedValue ?? "(empty)";
             CopyableValue = string.IsNullOrWhiteSpace(resolvedValue) ? null : resolvedValue;
 
+            StateChanged?.Invoke();
+
             return OperationResult.Ok();
         }
         catch (Exception ex)
         {
-            if (requestVersion != Volatile.Read(ref _loadVersion) || SelectedVersionId != selectedVersion.Version)
+            if (requestGeneration != Volatile.Read(ref _loadGeneration) || SelectedVersionId != selectedVersion.Version)
             {
                 return OperationResult.Stale();
             }
 
             ValueText = $"Error: {ex.Message}";
             CopyableValue = null;
+
+            StateChanged?.Invoke();
+
             return OperationResult.Fail(ex.Message);
         }
     }

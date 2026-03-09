@@ -41,21 +41,19 @@ public sealed class VersionsPanel : FrameView
         SetTableSource([]);
         _tableView.SelectedCellChanged += OnVersionSelectionChanged;
 
+        _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
+
         Add(_tableView);
     }
 
     public void Clear()
     {
-        SetTableSource([]);
+        // ClearForSecretSwitch on VM raises StateChanged → RenderFromViewModel
     }
 
     public async Task LoadForSecretAsync(string vaultName, string secretName)
     {
-        _app.Invoke(() =>
-        {
-            StatusChanged?.Invoke($"Loading versions for {secretName}...");
-            SetTableSource([]);
-        });
+        _app.Invoke(() => StatusChanged?.Invoke($"Loading versions for {secretName}..."));
 
         var result = await _viewModel.LoadForSecretAsync(vaultName, secretName);
 
@@ -74,15 +72,10 @@ public sealed class VersionsPanel : FrameView
                 return;
             }
 
-            SetTableSource(_viewModel.Versions);
-
+            // StateChanged already fired from VM → RenderFromViewModel handled the table.
             if (_viewModel.Versions.Count > 0)
             {
                 StatusChanged?.Invoke($"Loaded {_viewModel.Versions.Count} version(s) for {secretName}");
-
-                _tableView.SelectedCellChanged -= OnVersionSelectionChanged;
-                _tableView.SelectedRow = -1;
-                _tableView.SelectedCellChanged += OnVersionSelectionChanged;
             }
             else
             {
@@ -94,6 +87,16 @@ public sealed class VersionsPanel : FrameView
     public async Task RefreshAsync(string vaultName, string secretName)
     {
         await LoadForSecretAsync(vaultName, secretName);
+    }
+
+    private void RenderFromViewModel()
+    {
+        SetTableSource(_viewModel.Versions);
+
+        // Deselect to avoid auto-selecting first row after data changes
+        _tableView.SelectedCellChanged -= OnVersionSelectionChanged;
+        _tableView.SelectedRow = -1;
+        _tableView.SelectedCellChanged += OnVersionSelectionChanged;
     }
 
     private void SetTableSource(IEnumerable<SecretVersion> versions)

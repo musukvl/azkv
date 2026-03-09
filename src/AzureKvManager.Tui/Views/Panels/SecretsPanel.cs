@@ -42,7 +42,7 @@ public sealed class SecretsPanel : FrameView
             Width = Dim.Fill(),
             Height = 1
         };
-        _filterField.TextChanged += (s, e) => FilterSecrets();
+        _filterField.TextChanged += (s, e) => _viewModel.ApplyFilter(_filterField.Text?.ToString());
 
         _tableView = new TableView
         {
@@ -80,6 +80,8 @@ public sealed class SecretsPanel : FrameView
         };
         reloadButton.Accepting += async (s, e) => await ReloadSecrets();
 
+        _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
+
         Add(filterLabel, _filterField, _tableView, addSecretButton, reloadButton);
     }
 
@@ -89,7 +91,7 @@ public sealed class SecretsPanel : FrameView
     {
         CurrentVaultName = null;
         _filterField.Text = string.Empty;
-        SetTableSource([]);
+        // ClearForVaultSwitch on VM raises StateChanged → RenderFromViewModel
     }
 
     public async Task LoadForVaultAsync(string vaultName)
@@ -97,18 +99,12 @@ public sealed class SecretsPanel : FrameView
         CurrentVaultName = vaultName;
 
         StatusChanged?.Invoke($"Loading secrets from {vaultName}...");
-        SetTableSource([]);
 
         var result = await _viewModel.LoadForVaultAsync(vaultName);
 
         _app.Invoke(() =>
         {
-            if (CurrentVaultName != vaultName)
-            {
-                return;
-            }
-
-            if (result.IsStale)
+            if (CurrentVaultName != vaultName || result.IsStale)
             {
                 return;
             }
@@ -121,11 +117,9 @@ public sealed class SecretsPanel : FrameView
                 return;
             }
 
-            FilterSecrets();
-
+            // LoadForVaultAsync calls ApplyFilter internally, which raises StateChanged → RenderFromViewModel.
             if (_viewModel.AllSecrets.Count == 0)
             {
-                SetTableSource([]);
                 StatusChanged?.Invoke($"No secrets in {vaultName}");
                 return;
             }
@@ -134,12 +128,19 @@ public sealed class SecretsPanel : FrameView
         });
     }
 
-    private void FilterSecrets()
+    private void RenderFromViewModel()
     {
-        _viewModel.ApplyFilter(_filterField.Text?.ToString());
         SetTableSource(_viewModel.FilteredSecrets);
 
-        if (CurrentVaultName is not null)
+        // Sync filter field if VM was cleared (e.g., vault switch)
+        var vmFilterText = _viewModel.FilterText;
+        var fieldText = _filterField.Text?.ToString()?.Trim() ?? string.Empty;
+        if (vmFilterText != fieldText)
+        {
+            _filterField.Text = vmFilterText;
+        }
+
+        if (CurrentVaultName is not null && _viewModel.AllSecrets.Count > 0)
         {
             var filteredCount = _viewModel.FilteredSecrets.Count;
             var totalCount = _viewModel.AllSecrets.Count;
@@ -243,12 +244,7 @@ public sealed class SecretsPanel : FrameView
 
         _app.Invoke(() =>
         {
-            if (CurrentVaultName != vaultName)
-            {
-                return;
-            }
-
-            if (refreshResult.IsStale)
+            if (CurrentVaultName != vaultName || refreshResult.IsStale)
             {
                 return;
             }
@@ -261,21 +257,13 @@ public sealed class SecretsPanel : FrameView
                 return;
             }
 
-            var filterText = _filterField.Text?.ToString()?.Trim() ?? string.Empty;
-
-            if (!string.IsNullOrWhiteSpace(filterText))
-            {
-                FilterSecrets();
-                return;
-            }
-
-            SetTableSource(_viewModel.FilteredSecrets);
+            // StateChanged already fired from VM → RenderFromViewModel handled the table update.
             StatusChanged?.Invoke($"Loaded {_viewModel.AllSecrets.Count} secret(s) from {vaultName}");
         });
     }
 
     private static string FormatDate(DateTime? dateTime)
     {
-        return dateTime?.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture) ?? " ";
+        return dateTime?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? " ";
     }
 }

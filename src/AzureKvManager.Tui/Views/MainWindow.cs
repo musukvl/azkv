@@ -130,21 +130,17 @@ public class MainWindow : Window
 
     private void OnKeyVaultSelected(KeyVault keyVault)
     {
+        // SelectVault clears child VMs which raise StateChanged → panels auto-render
         _viewModel.SelectVault(keyVault.Name);
-
         _secretsPanel.Clear();
-        _versionsPanel.Clear();
-        _detailsPanel.Clear();
 
         _ = _secretsPanel.LoadForVaultAsync(keyVault.Name);
     }
 
     private void OnSecretSelected(Secret secret)
     {
+        // SelectSecret clears child VMs which raise StateChanged → panels auto-render
         _viewModel.SelectSecret(secret.Name);
-
-        _versionsPanel.Clear();
-        _detailsPanel.Clear();
 
         if (_viewModel.SelectedVaultName is not null)
         {

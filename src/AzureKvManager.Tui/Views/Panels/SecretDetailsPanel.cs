@@ -108,28 +108,17 @@ public sealed class SecretDetailsPanel : View
 
         ValueFrame.Add(_valueView);
 
-        UpdateFromViewModel();
-    }
+        _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
-    public void UpdateFromViewModel()
-    {
-        _contentTypeView.Text = _viewModel.ContentTypeText;
-        _expirationLabel.Text = _viewModel.ExpirationText;
-        _valueView.Text = _viewModel.ValueText;
-        _copyButton.Enabled = _viewModel.CanCopy;
+        RenderFromViewModel();
     }
 
     public async Task LoadVersionDetailsAsync(string vaultName, string secretName, SecretVersion version)
     {
-        var loadTask = _viewModel.LoadForVersionAsync(vaultName, secretName, version);
+        _app.Invoke(() => StatusChanged?.Invoke("Loading secret value..."));
 
-        _app.Invoke(() =>
-        {
-            StatusChanged?.Invoke("Loading secret value...");
-            UpdateFromViewModel();
-        });
-
-        var loadResult = await loadTask;
+        // LoadForVersionAsync raises StateChanged at key points → RenderFromViewModel auto-updates UI
+        var loadResult = await _viewModel.LoadForVersionAsync(vaultName, secretName, version);
 
         _app.Invoke(() =>
         {
@@ -137,8 +126,6 @@ public sealed class SecretDetailsPanel : View
             {
                 return;
             }
-
-            UpdateFromViewModel();
 
             if (!loadResult.Success)
             {
@@ -153,16 +140,18 @@ public sealed class SecretDetailsPanel : View
         });
     }
 
-    public void Clear(bool clearValue = true)
-    {
-        _viewModel.Clear(clearValue);
-        UpdateFromViewModel();
-    }
-
     public void ApplyTheme()
     {
         ApplyReadableTextScheme(_contentTypeView);
         ApplyReadableTextScheme(_valueView);
+    }
+
+    private void RenderFromViewModel()
+    {
+        _contentTypeView.Text = _viewModel.ContentTypeText;
+        _expirationLabel.Text = _viewModel.ExpirationText;
+        _valueView.Text = _viewModel.ValueText;
+        _copyButton.Enabled = _viewModel.CanCopy;
     }
 
     private void CopySecretValue()

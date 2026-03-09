@@ -49,15 +49,16 @@ public sealed class KeyVaultsPanel : FrameView
             Height = Dim.Fill()
         };
 
-        _filterField.TextChanged += (s, e) => FilterKeyVaults();
+        _filterField.TextChanged += (s, e) => _viewModel.ApplyFilter(_filterField.Text?.ToString());
         _listView.ValueChanged += OnKeyVaultSelectionChanged;
+
+        _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
         Add(filterLabel, _filterField, _listView);
     }
 
     public void SetInitialFilter(string filter)
     {
-        _filterField.TextChanged -= null!;
         _filterField.Text = filter;
     }
 
@@ -73,22 +74,21 @@ public sealed class KeyVaultsPanel : FrameView
 
         _app.Invoke(() =>
         {
+            if (result.IsStale)
+            {
+                return;
+            }
+
             if (!result.Success)
             {
-                if (result.IsStale)
-                {
-                    return;
-                }
-
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error: {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {errorMessage}", "OK");
                 return;
             }
 
-            _viewModel.ApplyFilter(_filterField.Text?.ToString());
-            RenderKeyVaultList();
-
+            // RefreshAsync calls ApplyFilter internally, which raises StateChanged → RenderFromViewModel.
+            // Just handle the empty case for status.
             if (_viewModel.AllKeyVaults.Count == 0)
             {
                 _listView.SetSource(new ObservableCollection<string> { "No Key Vaults found" });
@@ -97,13 +97,7 @@ public sealed class KeyVaultsPanel : FrameView
         });
     }
 
-    private void FilterKeyVaults()
-    {
-        _viewModel.ApplyFilter(_filterField.Text?.ToString());
-        RenderKeyVaultList();
-    }
-
-    private void RenderKeyVaultList()
+    private void RenderFromViewModel()
     {
         var filteredKeyVaults = _viewModel.FilteredKeyVaults;
         var totalKeyVaults = _viewModel.AllKeyVaults.Count;

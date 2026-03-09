@@ -15,6 +15,8 @@ public sealed class VersionsViewModel
         _dataService = dataService;
     }
 
+    public event Action? StateChanged;
+
     public IReadOnlyList<SecretVersion> Versions => _versions;
 
     public SecretVersion? SelectedVersion { get; private set; }
@@ -24,6 +26,7 @@ public sealed class VersionsViewModel
         SelectedVersion = null;
         _versions = [];
         Interlocked.Increment(ref _loadGeneration);
+        StateChanged?.Invoke();
     }
 
     public async Task<OperationResult> LoadForSecretAsync(string vaultName, string secretName)
@@ -45,6 +48,8 @@ public sealed class VersionsViewModel
                 .OrderByDescending(GetVersionSortKey)
                 .ThenByDescending(version => version.Version, StringComparer.Ordinal)
                 .ToList();
+
+            StateChanged?.Invoke();
 
             return OperationResult.Ok();
         }

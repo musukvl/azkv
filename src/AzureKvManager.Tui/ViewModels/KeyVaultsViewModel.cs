@@ -14,6 +14,8 @@ public sealed class KeyVaultsViewModel
         _dataService = dataService;
     }
 
+    public event Action? StateChanged;
+
     public IReadOnlyList<KeyVault> AllKeyVaults => _allKeyVaults;
 
     public IReadOnlyList<KeyVault> FilteredKeyVaults => _filteredKeyVaults;
@@ -46,12 +48,11 @@ public sealed class KeyVaultsViewModel
         }
         else
         {
-            var loweredFilter = FilterText.ToLowerInvariant();
             _filteredKeyVaults = _allKeyVaults
                 .Where(kv =>
-                    kv.Name.ToLowerInvariant().Contains(loweredFilter) ||
-                    kv.ResourceGroup.ToLowerInvariant().Contains(loweredFilter) ||
-                    kv.Subscription.ToLowerInvariant().Contains(loweredFilter))
+                    kv.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    kv.ResourceGroup.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    kv.Subscription.Contains(FilterText, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
@@ -59,6 +60,8 @@ public sealed class KeyVaultsViewModel
         {
             SelectedKeyVault = null;
         }
+
+        StateChanged?.Invoke();
     }
 
     public bool TrySelectByIndex(int index, out KeyVault? selectedKeyVault)

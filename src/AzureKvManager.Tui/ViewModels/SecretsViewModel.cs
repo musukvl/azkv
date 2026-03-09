@@ -16,6 +16,8 @@ public sealed class SecretsViewModel
         _dataService = dataService;
     }
 
+    public event Action? StateChanged;
+
     public IReadOnlyList<Secret> AllSecrets => _allSecrets;
 
     public IReadOnlyList<Secret> FilteredSecrets => _filteredSecrets;
@@ -31,6 +33,7 @@ public sealed class SecretsViewModel
         _allSecrets = [];
         _filteredSecrets = [];
         Interlocked.Increment(ref _loadGeneration);
+        StateChanged?.Invoke();
     }
 
     public async Task<OperationResult> LoadForVaultAsync(string vaultName)
@@ -69,11 +72,10 @@ public sealed class SecretsViewModel
         }
         else
         {
-            var loweredFilter = FilterText.ToLowerInvariant();
             _filteredSecrets = _allSecrets
                 .Where(secret =>
-                    secret.Name.ToLowerInvariant().Contains(loweredFilter) ||
-                    (secret.ContentType ?? string.Empty).ToLowerInvariant().Contains(loweredFilter))
+                    secret.Name.Contains(FilterText, StringComparison.OrdinalIgnoreCase) ||
+                    (secret.ContentType ?? string.Empty).Contains(FilterText, StringComparison.OrdinalIgnoreCase))
                 .ToList();
         }
 
@@ -82,6 +84,8 @@ public sealed class SecretsViewModel
         {
             SelectedSecret = null;
         }
+
+        StateChanged?.Invoke();
     }
 
     public bool TrySelectByIndex(int index, out Secret? selectedSecret)
