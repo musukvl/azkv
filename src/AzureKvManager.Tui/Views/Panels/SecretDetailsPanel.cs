@@ -99,9 +99,9 @@ public sealed class SecretDetailsPanel : View
         ApplyReadableTextScheme(_valueView);
         ValueFrame.Add(_valueView);
 
-        // Bind Ctrl+C / Alt+C to copy full secret value (overrides default text selection copy)
+        // Replace default Ctrl+C (text selection copy) with full secret value copy
+        _valueView.KeyBindings.ReplaceCommands(Key.C.WithCtrl, [Command.Copy]);
         AddCommand(Command.Copy, () => { CopySecretValue(); return true; });
-        _valueView.KeyBindings.Add(Key.C.WithCtrl, [Command.Copy]);
         _valueView.KeyBindings.Add(Key.C.WithAlt, [Command.Copy]);
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
