@@ -80,6 +80,9 @@ class Program
     
     static void ShowHelp()
     {
+        ThemeProvider.Initialize();
+        var availableThemes = string.Join(", ", ThemeProvider.GetThemeNames());
+
         AnsiConsole.Write(
             new FigletText("Azure KV Manager")
                 .LeftJustified()
@@ -92,7 +95,8 @@ class Program
         
         AnsiConsole.MarkupLine("[bold]OPTIONS:[/]");
         AnsiConsole.MarkupLine("  [cyan]-s, --subscription[/] [grey]<NAME>[/]   Switch to the specified Azure subscription");
-        AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]          Set color theme (e.g. Dark, Light, \"Amber Phosphor\")");
+        AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]          Set color theme");
+        AnsiConsole.MarkupLine($"                                     [grey]Themes:[/] {Markup.Escape(availableThemes)}");
         AnsiConsole.MarkupLine("  [cyan]-h, --help[/]                           Show this help message");
         AnsiConsole.WriteLine();
         
