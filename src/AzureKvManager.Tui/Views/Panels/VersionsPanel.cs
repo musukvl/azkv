@@ -23,13 +23,15 @@ public sealed class VersionsPanel : FrameView
         _viewModel = viewModel;
 
         Title = "Secret Versions";
+        TabStop = TabBehavior.TabGroup;
 
         _tableView = new TableView
         {
             X = 0,
             Y = 0,
             Width = Dim.Fill(),
-            Height = Dim.Fill()
+            Height = Dim.Fill(),
+            TabStop = TabBehavior.TabStop
         };
 
         _tableView.FullRowSelect = true;

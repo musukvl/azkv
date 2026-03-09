@@ -12,7 +12,12 @@
       "Bash(python3 -c \":*)",
       "Bash(mkdir -p nscheck)",
       "Bash(dotnet add package Terminal.Gui --version 2.0.0-develop.5125)",
-      "Bash(Program.cs:*)"
+      "Bash(Program.cs:*)",
+      "Bash(grep -A 20 '<member name=\"\"M:Terminal.Gui.Views.Dialog`1.AddButton' /home/musuk/.nuget/packages/terminal.gui/2.0.0-develop.5125/lib/net10.0/Terminal.Gui.xml)",
+      "Bash(grep '<member name=\"\"P:Terminal.Gui.Views.Dialog`1.Buttons\"\"' -A 10 /home/musuk/.nuget/packages/terminal.gui/2.0.0-develop.5125/lib/net10.0/Terminal.Gui.xml)",
+      "Bash(python3:*)",
+      "Bash(dotnet restore)",
+      "Bash(dotnet --list-sdks)"
     ]
   }
 }

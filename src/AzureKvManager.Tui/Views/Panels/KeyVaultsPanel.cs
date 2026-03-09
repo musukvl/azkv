@@ -24,10 +24,11 @@ public sealed class KeyVaultsPanel : FrameView
         _viewModel = viewModel;
 
         Title = "Key Vaults";
+        TabStop = TabBehavior.TabGroup;
 
         var filterLabel = new Label
         {
-            Text = "Filter:",
+            Text = "_Filter:",
             X = 0,
             Y = 0,
             Width = 7
@@ -38,7 +39,8 @@ public sealed class KeyVaultsPanel : FrameView
             X = Pos.Right(filterLabel),
             Y = 0,
             Width = Dim.Fill(),
-            Height = 1
+            Height = 1,
+            TabStop = TabBehavior.TabStop
         };
 
         _listView = new ListView
@@ -46,7 +48,8 @@ public sealed class KeyVaultsPanel : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill()
+            Height = Dim.Fill(),
+            TabStop = TabBehavior.TabStop
         };
 
         _filterField.TextChanged += (s, e) => _viewModel.ApplyFilter(_filterField.Text?.ToString());

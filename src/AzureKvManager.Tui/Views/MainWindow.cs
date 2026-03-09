@@ -1,5 +1,6 @@
 using Terminal.Gui;
 using Terminal.Gui.App;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
@@ -18,7 +19,8 @@ public class MainWindow : Window
     private readonly SecretsPanel _secretsPanel;
     private readonly VersionsPanel _versionsPanel;
     private readonly SecretDetailsPanel _detailsPanel;
-    private readonly Label _statusLabel;
+    private readonly StatusBar _statusBar;
+    private readonly Shortcut _statusShortcut;
 
     public MainWindow(IApplication app, MainWindowViewModel viewModel, string? initialFilter = null)
     {
@@ -92,18 +94,18 @@ public class MainWindow : Window
         _detailsPanel.ValueFrame.Width = Dim.Fill();
         _detailsPanel.ValueFrame.Height = Dim.Fill(2);
 
-        _statusLabel = new Label
-        {
-            Text = "Loading Key Vaults...",
-            X = 0,
-            Y = Pos.AnchorEnd(1),
-            Width = Dim.Fill()
-        };
+        _statusShortcut = new Shortcut { Text = "Loading Key Vaults..." };
+        _statusBar = new StatusBar(
+        [
+            _statusShortcut,
+            new Shortcut(Key.F5, "_Refresh All", () => _keyVaultsPanel!.RefreshKeyVaults()),
+            new Shortcut(Key.F1, "_About", ShowAbout)
+        ]);
 
         Add(_keyVaultsPanel, _secretsPanel, _versionsPanel,
             _detailsPanel.ActionsFrame, _detailsPanel.ContentTypeFrame,
             _detailsPanel.ExpirationFrame, _detailsPanel.ValueFrame,
-            _statusLabel);
+            _statusBar);
 
         // Wire events
         _keyVaultsPanel.KeyVaultSelected += OnKeyVaultSelected;
@@ -238,6 +240,6 @@ public class MainWindow : Window
 
     private void UpdateStatus(string message)
     {
-        _statusLabel.Text = message;
+        _statusShortcut.Text = message;
     }
 }

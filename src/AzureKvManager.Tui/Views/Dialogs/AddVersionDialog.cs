@@ -20,7 +20,7 @@ public sealed class AddVersionDialog : Dialog
 
         var valueLabel = new Label
         {
-            Text = "Secret Value:",
+            Text = "Secret _Value:",
             X = 1,
             Y = 1
         };
@@ -35,7 +35,7 @@ public sealed class AddVersionDialog : Dialog
 
         var contentTypeLabel = new Label
         {
-            Text = "Content Type (optional):",
+            Text = "_Content Type (optional):",
             X = 1,
             Y = Pos.Bottom(valueField) + 1
         };
@@ -49,7 +49,7 @@ public sealed class AddVersionDialog : Dialog
 
         var expirationDateLabel = new Label
         {
-            Text = "Expiration Date (yyyy-MM-dd, optional):",
+            Text = "_Expiration Date (yyyy-MM-dd, optional):",
             X = 1,
             Y = Pos.Bottom(contentTypeField) + 1
         };
@@ -61,14 +61,7 @@ public sealed class AddVersionDialog : Dialog
             Width = Dim.Fill(1)
         };
 
-        var okButton = new Button
-        {
-            Text = "OK",
-            IsDefault = true,
-            X = Pos.Center() - 10,
-            Y = Pos.Bottom(expirationDateField) + 1
-        };
-
+        var okButton = new Button { Text = "OK" };
         okButton.Accepting += (s, e) =>
         {
             var value = valueField.Text?.ToString()?.Trim();
@@ -89,16 +82,14 @@ public sealed class AddVersionDialog : Dialog
             RequestStop();
         };
 
-        var cancelButton = new Button
-        {
-            Text = "Cancel",
-            X = Pos.Center() + 2,
-            Y = Pos.Bottom(expirationDateField) + 1
-        };
-
+        var cancelButton = new Button { Text = "Cancel" };
         cancelButton.Accepting += (s, e) => RequestStop();
 
         Add(valueLabel, valueField, contentTypeLabel, contentTypeField,
-            expirationDateLabel, expirationDateField, okButton, cancelButton);
+            expirationDateLabel, expirationDateField);
+
+        // AddButton manages layout; last added becomes default
+        AddButton(cancelButton);
+        AddButton(okButton);
     }
 }

@@ -1,7 +1,7 @@
 using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.Drawing;
-using Terminal.Gui.Drivers;
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
@@ -32,13 +32,14 @@ public sealed class SecretDetailsPanel : View
         _app = app;
         _viewModel = viewModel;
 
-        ActionsFrame = new FrameView { Title = "Actions" };
+        ActionsFrame = new FrameView { Title = "Actions", TabStop = TabBehavior.TabGroup };
 
         var addVersionButton = new Button
         {
             Text = "New _Version",
             X = 0,
-            Y = 0
+            Y = 0,
+            TabStop = TabBehavior.TabStop
         };
         addVersionButton.Accepting += (s, e) => AddVersionRequested?.Invoke();
 
@@ -47,13 +48,14 @@ public sealed class SecretDetailsPanel : View
             Text = "Copy _Value",
             X = Pos.Right(addVersionButton) + 1,
             Y = 0,
-            Enabled = false
+            Enabled = false,
+            TabStop = TabBehavior.TabStop
         };
         _copyButton.Accepting += (s, e) => CopySecretValue();
 
         ActionsFrame.Add(addVersionButton, _copyButton);
 
-        ContentTypeFrame = new FrameView { Title = "Content Type" };
+        ContentTypeFrame = new FrameView { Title = "Content Type", TabStop = TabBehavior.TabGroup };
 
         _contentTypeView = new TextView
         {
@@ -69,7 +71,7 @@ public sealed class SecretDetailsPanel : View
         ApplyReadableTextScheme(_contentTypeView);
         ContentTypeFrame.Add(_contentTypeView);
 
-        ExpirationFrame = new FrameView { Title = "Expiration Date" };
+        ExpirationFrame = new FrameView { Title = "Expiration Date", TabStop = TabBehavior.TabGroup };
 
         _expirationLabel = new Label
         {
@@ -81,7 +83,7 @@ public sealed class SecretDetailsPanel : View
 
         ExpirationFrame.Add(_expirationLabel);
 
-        ValueFrame = new FrameView { Title = "Secret Value" };
+        ValueFrame = new FrameView { Title = "Secret Value", TabStop = TabBehavior.TabGroup };
 
         _valueView = new TextView
         {
@@ -95,18 +97,12 @@ public sealed class SecretDetailsPanel : View
         };
 
         ApplyReadableTextScheme(_valueView);
-
-        _valueView.KeyDown += (s, e) =>
-        {
-            if (e.KeyCode == (KeyCode.C | KeyCode.CtrlMask) ||
-                e.KeyCode == (KeyCode.C | KeyCode.AltMask))
-            {
-                CopySecretValue();
-                e.Handled = true;
-            }
-        };
-
         ValueFrame.Add(_valueView);
+
+        // Bind Ctrl+C / Alt+C to copy full secret value (overrides default text selection copy)
+        AddCommand(Command.Copy, () => { CopySecretValue(); return true; });
+        _valueView.KeyBindings.Add(Key.C.WithCtrl, [Command.Copy]);
+        _valueView.KeyBindings.Add(Key.C.WithAlt, [Command.Copy]);
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 

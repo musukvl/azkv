@@ -26,10 +26,11 @@ public sealed class SecretsPanel : FrameView
         _viewModel = viewModel;
 
         Title = "Secrets";
+        TabStop = TabBehavior.TabGroup;
 
         var filterLabel = new Label
         {
-            Text = "Filter:",
+            Text = "_Filter:",
             X = 0,
             Y = 0,
             Width = 7
@@ -40,7 +41,8 @@ public sealed class SecretsPanel : FrameView
             X = Pos.Right(filterLabel),
             Y = 0,
             Width = Dim.Fill(),
-            Height = 1
+            Height = 1,
+            TabStop = TabBehavior.TabStop
         };
         _filterField.TextChanged += (s, e) => _viewModel.ApplyFilter(_filterField.Text?.ToString());
 
@@ -49,7 +51,8 @@ public sealed class SecretsPanel : FrameView
             X = 0,
             Y = 1,
             Width = Dim.Fill(),
-            Height = Dim.Fill(1)
+            Height = Dim.Fill(1),
+            TabStop = TabBehavior.TabStop
         };
 
         _tableView.FullRowSelect = true;
