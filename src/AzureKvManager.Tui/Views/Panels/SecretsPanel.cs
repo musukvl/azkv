@@ -117,7 +117,6 @@ public sealed class SecretsPanel : FrameView
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error loading secrets for kv {vaultName}: {errorMessage}");
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {errorMessage}", "OK");
                 return;
             }
 
@@ -210,7 +209,6 @@ public sealed class SecretsPanel : FrameView
         {
             var errorMessage = result.ErrorMessage ?? $"Failed to create secret '{addResult.Name}'";
             StatusChanged?.Invoke($"Error creating secret '{addResult.Name}': {errorMessage}");
-            MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret: {errorMessage}", "OK");
         });
     }
 
@@ -242,7 +240,6 @@ public sealed class SecretsPanel : FrameView
             {
                 var errorMessage = refreshResult.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error loading secrets for kv {vaultName}: {errorMessage}");
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh secrets: {errorMessage}", "OK");
                 return;
             }
 

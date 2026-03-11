@@ -129,7 +129,6 @@ public sealed class SecretDetailsPanel : View
             {
                 var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error loading secret data for '{secretName}': {errorMessage}");
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {errorMessage}", "OK");
                 return;
             }
 

@@ -29,6 +29,7 @@ public class MainWindow : Window
     private string _spinnerMessage = "Loading Key Vaults...";
     private int _spinnerFrameIndex;
     private long _spinnerGeneration;
+    private string? _activeErrorDetails;
 
     public MainWindow(IApplication app, MainWindowViewModel viewModel, string? initialFilter = null)
     {
@@ -109,6 +110,7 @@ public class MainWindow : Window
             Key = Key.Empty,
             MinimumKeyTextSize = 0
         };
+        _statusShortcut.Action = OnStatusShortcutActivated;
         _statusBar = new StatusBar(
         [
             _statusShortcut
@@ -226,7 +228,6 @@ public class MainWindow : Window
         {
             var errorMessage = result.ErrorMessage ?? $"Failed to create new version for '{secretName}'";
             UpdateStatus($"Error creating version for secret '{secretName}': {errorMessage}");
-            MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {errorMessage}", "OK");
         });
     }
 
@@ -257,11 +258,21 @@ public class MainWindow : Window
     {
         if (IsProgressMessage(message))
         {
+            ClearActiveError();
             StartSpinner(message);
             return;
         }
 
         StopSpinner();
+
+        if (IsErrorMessage(message))
+        {
+            SetActiveError(message);
+            SetStatusLine($"! {message} (click status for details)");
+            return;
+        }
+
+        ClearActiveError();
         SetStatusLine(message);
     }
 
@@ -280,6 +291,44 @@ public class MainWindow : Window
         return message.StartsWith("Loading ", StringComparison.OrdinalIgnoreCase)
             || message.StartsWith("Creating ", StringComparison.OrdinalIgnoreCase)
             || message.StartsWith("Reloading ", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsErrorMessage(string message)
+    {
+        return message.StartsWith("Error", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private void SetActiveError(string message)
+    {
+        lock (_statusLock)
+        {
+            _activeErrorDetails = message;
+        }
+    }
+
+    private void ClearActiveError()
+    {
+        lock (_statusLock)
+        {
+            _activeErrorDetails = null;
+        }
+    }
+
+    private void OnStatusShortcutActivated()
+    {
+        string? errorDetails;
+
+        lock (_statusLock)
+        {
+            errorDetails = _activeErrorDetails;
+        }
+
+        if (string.IsNullOrWhiteSpace(errorDetails))
+        {
+            return;
+        }
+
+        MessageBox.ErrorQuery(_app, "Operation Error", errorDetails, "OK");
     }
 
     private void StartSpinner(string message)
@@ -342,6 +391,11 @@ public class MainWindow : Window
                 frame = SpinnerFrames[_spinnerFrameIndex % SpinnerFrames.Length];
                 _spinnerFrameIndex++;
                 message = _spinnerMessage;
+            }
+
+            if (token.IsCancellationRequested)
+            {
+                return;
             }
 
             _app.Invoke(() => SetStatusLine($"{frame} {message}"));

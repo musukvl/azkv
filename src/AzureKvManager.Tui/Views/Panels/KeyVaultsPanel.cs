@@ -87,7 +87,6 @@ public sealed class KeyVaultsPanel : FrameView
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error loading Key Vaults: {errorMessage}");
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {errorMessage}", "OK");
                 return;
             }
 

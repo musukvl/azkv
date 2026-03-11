@@ -71,7 +71,6 @@ public sealed class VersionsPanel : FrameView
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
                 StatusChanged?.Invoke($"Error loading versions for secret {secretName}: {errorMessage}");
-                MessageBox.ErrorQuery(_app, "Error", $"Failed to load versions: {errorMessage}", "OK");
                 return;
             }
 
