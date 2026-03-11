@@ -111,7 +111,8 @@ public sealed class SecretDetailsPanel : View
 
     public async Task LoadVersionDetailsAsync(string vaultName, string secretName, SecretVersion version)
     {
-        _app.Invoke(() => StatusChanged?.Invoke("Loading secret value..."));
+        var shortVer = version.Version.Length > 8 ? version.Version[..8] : version.Version;
+        _app.Invoke(() => StatusChanged?.Invoke($"Loading version {shortVer} for secret {secretName}..."));
 
         // LoadForVersionAsync raises StateChanged at key points → RenderFromViewModel auto-updates UI
         var loadResult = await _viewModel.LoadForVersionAsync(vaultName, secretName, version);
@@ -120,19 +121,19 @@ public sealed class SecretDetailsPanel : View
         {
             if (loadResult.IsStale)
             {
+                StatusChanged?.Invoke("Secret data load canceled.");
                 return;
             }
 
             if (!loadResult.Success)
             {
                 var errorMessage = loadResult.ErrorMessage ?? "Unknown error";
-                StatusChanged?.Invoke($"Error: {errorMessage}");
+                StatusChanged?.Invoke($"Error loading secret data for '{secretName}': {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load secret value: {errorMessage}", "OK");
                 return;
             }
 
-            var shortVer = version.Version.Length > 8 ? version.Version[..8] : version.Version;
-            StatusChanged?.Invoke($"Loaded value for {secretName} (version {shortVer}...)");
+            StatusChanged?.Invoke($"Secret {secretName} data loaded.");
         });
     }
 
@@ -156,12 +157,11 @@ public sealed class SecretDetailsPanel : View
         {
             if (_app.Clipboard is null)
             {
-                StatusChanged?.Invoke("Clipboard is not available.");
+                MessageBox.ErrorQuery(_app, "Error", "Clipboard is not available.", "OK");
                 return;
             }
 
             _app.Clipboard.SetClipboardData(_viewModel.CopyableValue);
-            StatusChanged?.Invoke("Secret value copied to clipboard!");
         }
     }
 

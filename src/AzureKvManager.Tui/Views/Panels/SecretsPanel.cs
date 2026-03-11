@@ -101,7 +101,7 @@ public sealed class SecretsPanel : FrameView
     {
         CurrentVaultName = vaultName;
 
-        StatusChanged?.Invoke($"Loading secrets from {vaultName}...");
+        StatusChanged?.Invoke($"Loading secrets for kv {vaultName}...");
 
         var result = await _viewModel.LoadForVaultAsync(vaultName);
 
@@ -109,25 +109,20 @@ public sealed class SecretsPanel : FrameView
         {
             if (CurrentVaultName != vaultName || result.IsStale)
             {
+                StatusChanged?.Invoke("Secrets load canceled.");
                 return;
             }
 
             if (!result.Success)
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
-                StatusChanged?.Invoke($"Error: {errorMessage}");
+                StatusChanged?.Invoke($"Error loading secrets for kv {vaultName}: {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load secrets: {errorMessage}", "OK");
                 return;
             }
 
             // LoadForVaultAsync calls ApplyFilter internally, which raises StateChanged → RenderFromViewModel.
-            if (_viewModel.AllSecrets.Count == 0)
-            {
-                StatusChanged?.Invoke($"No secrets in {vaultName}");
-                return;
-            }
-
-            StatusChanged?.Invoke($"Loaded {_viewModel.AllSecrets.Count} secret(s) from {vaultName}");
+            StatusChanged?.Invoke($"Secrets loaded for kv {vaultName}. ({_viewModel.AllSecrets.Count} secret(s))");
         });
     }
 
@@ -141,16 +136,6 @@ public sealed class SecretsPanel : FrameView
         if (vmFilterText != fieldText)
         {
             _filterField.Text = vmFilterText;
-        }
-
-        if (CurrentVaultName is not null && _viewModel.AllSecrets.Count > 0)
-        {
-            var filteredCount = _viewModel.FilteredSecrets.Count;
-            var totalCount = _viewModel.AllSecrets.Count;
-
-            StatusChanged?.Invoke(filteredCount > 0
-                ? $"Showing {filteredCount} of {totalCount} secret(s) from {CurrentVaultName}"
-                : $"No matches found (total: {totalCount})");
         }
     }
 
@@ -205,7 +190,7 @@ public sealed class SecretsPanel : FrameView
         var vaultName = CurrentVaultName;
         if (vaultName is null) return;
 
-        _app.Invoke(() => StatusChanged?.Invoke($"Creating secret '{addResult.Name}'..."));
+        _app.Invoke(() => StatusChanged?.Invoke($"Creating secret '{addResult.Name}' in kv {vaultName}..."));
 
         var result = await _viewModel.CreateSecretAsync(vaultName, addResult.Name, addResult.Value, addResult.ContentType, addResult.ExpiresAt);
 
@@ -213,7 +198,7 @@ public sealed class SecretsPanel : FrameView
         {
             _app.Invoke(() =>
             {
-                StatusChanged?.Invoke($"Secret '{addResult.Name}' created successfully");
+                StatusChanged?.Invoke($"Secret '{addResult.Name}' created in kv {vaultName}.");
                 MessageBox.Query(_app, "Success", $"Secret '{addResult.Name}' has been created successfully!", "OK");
             });
 
@@ -224,7 +209,7 @@ public sealed class SecretsPanel : FrameView
         _app.Invoke(() =>
         {
             var errorMessage = result.ErrorMessage ?? $"Failed to create secret '{addResult.Name}'";
-            StatusChanged?.Invoke($"Error: {errorMessage}");
+            StatusChanged?.Invoke($"Error creating secret '{addResult.Name}': {errorMessage}");
             MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret: {errorMessage}", "OK");
         });
     }
@@ -237,7 +222,7 @@ public sealed class SecretsPanel : FrameView
             return;
         }
 
-        StatusChanged?.Invoke($"Reloading secrets from {CurrentVaultName}...");
+        StatusChanged?.Invoke($"Reloading secrets for kv {CurrentVaultName}...");
         await RefreshAsync(CurrentVaultName);
     }
 
@@ -249,19 +234,20 @@ public sealed class SecretsPanel : FrameView
         {
             if (CurrentVaultName != vaultName || refreshResult.IsStale)
             {
+                StatusChanged?.Invoke("Secrets load canceled.");
                 return;
             }
 
             if (!refreshResult.Success)
             {
                 var errorMessage = refreshResult.ErrorMessage ?? "Unknown error";
-                StatusChanged?.Invoke($"Error: {errorMessage}");
+                StatusChanged?.Invoke($"Error loading secrets for kv {vaultName}: {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to refresh secrets: {errorMessage}", "OK");
                 return;
             }
 
             // StateChanged already fired from VM → RenderFromViewModel handled the table update.
-            StatusChanged?.Invoke($"Loaded {_viewModel.AllSecrets.Count} secret(s) from {vaultName}");
+            StatusChanged?.Invoke($"Secrets loaded for kv {vaultName}. ({_viewModel.AllSecrets.Count} secret(s))");
         });
     }
 

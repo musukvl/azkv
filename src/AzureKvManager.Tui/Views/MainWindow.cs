@@ -94,12 +94,16 @@ public class MainWindow : Window
         _detailsPanel.ValueFrame.Width = Dim.Fill();
         _detailsPanel.ValueFrame.Height = Dim.Fill(2);
 
-        _statusShortcut = new Shortcut { Text = "Loading Key Vaults..." };
+        _statusShortcut = new Shortcut
+        {
+            Title = "Loading Key Vaults...",
+            Text = string.Empty,
+            Key = Key.Empty,
+            MinimumKeyTextSize = 0
+        };
         _statusBar = new StatusBar(
         [
-            _statusShortcut,
-            new Shortcut(Key.F5, "_Refresh All", () => _keyVaultsPanel!.RefreshKeyVaults()),
-            new Shortcut(Key.F1, "_About", ShowAbout)
+            _statusShortcut
         ]);
 
         Add(_keyVaultsPanel, _secretsPanel, _versionsPanel,
@@ -191,7 +195,7 @@ public class MainWindow : Window
         var secretName = _viewModel.SelectedSecretName;
         if (vaultName is null || secretName is null) return;
 
-        _app.Invoke(() => UpdateStatus($"Creating new version for '{secretName}'..."));
+        _app.Invoke(() => UpdateStatus($"Creating version for secret '{secretName}'..."));
 
         var result = await _viewModel.Versions.CreateVersionAsync(vaultName, secretName, addResult.Value, addResult.ContentType, addResult.ExpiresAt);
 
@@ -199,7 +203,7 @@ public class MainWindow : Window
         {
             _app.Invoke(() =>
             {
-                UpdateStatus($"New version created for '{secretName}'");
+                UpdateStatus($"Version created for secret '{secretName}'.");
                 MessageBox.Query(_app, "Success", $"New version of '{secretName}' has been created successfully!", "OK");
             });
 
@@ -210,7 +214,7 @@ public class MainWindow : Window
         _app.Invoke(() =>
         {
             var errorMessage = result.ErrorMessage ?? $"Failed to create new version for '{secretName}'";
-            UpdateStatus($"Error: {errorMessage}");
+            UpdateStatus($"Error creating version for secret '{secretName}': {errorMessage}");
             MessageBox.ErrorQuery(_app, "Error", $"Failed to create secret version: {errorMessage}", "OK");
         });
     }
@@ -240,6 +244,9 @@ public class MainWindow : Window
 
     private void UpdateStatus(string message)
     {
-        _statusShortcut.Text = message;
+        _statusShortcut.Title = message;
+        _statusShortcut.Text = string.Empty;
+        _statusShortcut.SetNeedsDraw();
+        _statusBar.SetNeedsDraw();
     }
 }

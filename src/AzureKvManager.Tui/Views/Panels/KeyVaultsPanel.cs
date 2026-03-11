@@ -79,45 +79,37 @@ public sealed class KeyVaultsPanel : FrameView
         {
             if (result.IsStale)
             {
+                StatusChanged?.Invoke("Key Vaults load canceled.");
                 return;
             }
 
             if (!result.Success)
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
-                StatusChanged?.Invoke($"Error: {errorMessage}");
+                StatusChanged?.Invoke($"Error loading Key Vaults: {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load Key Vaults: {errorMessage}", "OK");
                 return;
             }
 
             // RefreshAsync calls ApplyFilter internally, which raises StateChanged → RenderFromViewModel.
-            // Just handle the empty case for status.
             if (_viewModel.AllKeyVaults.Count == 0)
             {
                 _listView.SetSource(new ObservableCollection<string> { "No Key Vaults found" });
-                StatusChanged?.Invoke("No Key Vaults found");
+                StatusChanged?.Invoke("Key Vaults loaded. No Key Vaults found.");
+                return;
             }
+
+            StatusChanged?.Invoke("Key Vaults loaded.");
         });
     }
 
     private void RenderFromViewModel()
     {
         var filteredKeyVaults = _viewModel.FilteredKeyVaults;
-        var totalKeyVaults = _viewModel.AllKeyVaults.Count;
 
         _listView.SetSource(new ObservableCollection<string>(
             filteredKeyVaults.Select(kv => $"{kv.Name} ({kv.ResourceGroup})")
         ));
-
-        if (totalKeyVaults == 0)
-        {
-            StatusChanged?.Invoke("No Key Vaults found");
-            return;
-        }
-
-        StatusChanged?.Invoke(filteredKeyVaults.Count > 0
-            ? $"Showing {filteredKeyVaults.Count} of {totalKeyVaults} Key Vault(s)"
-            : $"No matches found (total: {totalKeyVaults})");
     }
 
     private void OnKeyVaultSelectionChanged(object? sender, ValueChangedEventArgs<int?> args)

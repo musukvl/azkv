@@ -56,7 +56,7 @@ The TUI application provides a terminal-based interface with the following featu
 - **Center Panel**: Secrets list with filter by name and "New Secret" button
 - **Top-Right Panel**: Secret versions list with "New Version" and "Copy Value" buttons
 - **Bottom-Right Panel**: Secret value viewer with read-only multi-line display
-- **Status Bar**: Real-time operation feedback and error messages
+- **Status Bar**: Operation lifecycle feedback only (loading, loaded, error, canceled)
 
 ### Features
 - Real-time filtering for Key Vaults and Secrets
@@ -65,6 +65,8 @@ The TUI application provides a terminal-based interface with the following featu
 - Copy secret values to clipboard
 - Automatic list refresh after operations
 - Clear error handling with user feedback
+- Status bar is reserved for async operation lifecycle messages only (no filter summary text)
+- Superseded (stale) background loads should report a canceled status
 - Keyboard navigation (Tab, Arrow keys, Enter)
 - Menu bar with File and Help options
 

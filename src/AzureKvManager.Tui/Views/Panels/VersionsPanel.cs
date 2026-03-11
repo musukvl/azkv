@@ -55,7 +55,7 @@ public sealed class VersionsPanel : FrameView
 
     public async Task LoadForSecretAsync(string vaultName, string secretName)
     {
-        _app.Invoke(() => StatusChanged?.Invoke($"Loading versions for {secretName}..."));
+        _app.Invoke(() => StatusChanged?.Invoke($"Loading versions for secret {secretName}..."));
 
         var result = await _viewModel.LoadForSecretAsync(vaultName, secretName);
 
@@ -63,26 +63,20 @@ public sealed class VersionsPanel : FrameView
         {
             if (result.IsStale)
             {
+                StatusChanged?.Invoke("Versions load canceled.");
                 return;
             }
 
             if (!result.Success)
             {
                 var errorMessage = result.ErrorMessage ?? "Unknown error";
-                StatusChanged?.Invoke($"Error: {errorMessage}");
+                StatusChanged?.Invoke($"Error loading versions for secret {secretName}: {errorMessage}");
                 MessageBox.ErrorQuery(_app, "Error", $"Failed to load versions: {errorMessage}", "OK");
                 return;
             }
 
             // StateChanged already fired from VM → RenderFromViewModel handled the table.
-            if (_viewModel.Versions.Count > 0)
-            {
-                StatusChanged?.Invoke($"Loaded {_viewModel.Versions.Count} version(s) for {secretName}");
-            }
-            else
-            {
-                StatusChanged?.Invoke($"No versions for {secretName}");
-            }
+            StatusChanged?.Invoke($"Versions loaded for secret {secretName}. ({_viewModel.Versions.Count} version(s))");
         });
     }
 
