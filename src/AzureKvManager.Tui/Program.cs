@@ -60,7 +60,7 @@ class Program
 
     sealed class LaunchCommand : Command<LaunchSettings>
     {
-        public override int Execute(CommandContext context, LaunchSettings settings, CancellationToken cancellationToken)
+        protected override int Execute(CommandContext context, LaunchSettings settings, CancellationToken cancellationToken)
         {
             return RunApplication(settings.Subscription, settings.ThemeName, settings.Filter);
         }
