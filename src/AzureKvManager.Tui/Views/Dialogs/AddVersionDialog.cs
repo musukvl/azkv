@@ -1,5 +1,3 @@
-using Terminal.Gui;
-using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
@@ -8,11 +6,9 @@ namespace AzureKvManager.Tui.Views.Dialogs;
 
 public sealed record AddVersionResult(string Value, string? ContentType, DateTime? ExpiresAt);
 
-public sealed class AddVersionDialog : Dialog
+public sealed class AddVersionDialog : Dialog<AddVersionResult>
 {
-    public new AddVersionResult? Result { get; private set; }
-
-    public AddVersionDialog(IApplication app, string secretName)
+    public AddVersionDialog(string secretName)
     {
         Title = $"Add New Version to '{secretName}'";
         Width = Dim.Percent(60);
@@ -74,16 +70,17 @@ public sealed class AddVersionDialog : Dialog
                     out var expiresAt,
                     out var errorMessage))
             {
-                MessageBox.ErrorQuery(app, "Error", errorMessage ?? "Invalid input", "OK");
+                e.Handled = true;
+                MessageBox.ErrorQuery(App!, "Error", errorMessage ?? "Invalid input", "OK");
                 return;
             }
 
             Result = new AddVersionResult(value!, contentType, expiresAt);
+            e.Handled = true;
             RequestStop();
         };
 
         var cancelButton = new Button { Text = "Cancel" };
-        cancelButton.Accepting += (s, e) => RequestStop();
 
         Add(valueLabel, valueField, contentTypeLabel, contentTypeField,
             expirationDateLabel, expirationDateField);

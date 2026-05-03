@@ -1,12 +1,9 @@
-using Terminal.Gui;
 using Terminal.Gui.App;
-using Terminal.Gui.Drawing;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
 using AzureKvManager.Tui.ViewModels;
-using AzureKvManager.Tui.Views.Dialogs;
 
 namespace AzureKvManager.Tui.Views.Panels;
 
@@ -15,6 +12,10 @@ public sealed class SecretDetailsPanel : View
     private readonly IApplication _app;
     private readonly SecretDetailsViewModel _viewModel;
     private readonly Button _copyButton;
+    private readonly FrameView _actionsFrame;
+    private readonly FrameView _contentTypeFrame;
+    private readonly FrameView _expirationFrame;
+    private readonly FrameView _valueFrame;
     private readonly TextView _contentTypeView;
     private readonly Label _expirationLabel;
     private readonly TextView _valueView;
@@ -22,17 +23,22 @@ public sealed class SecretDetailsPanel : View
     public event Action? AddVersionRequested;
     public event Action<string>? StatusChanged;
 
-    public FrameView ActionsFrame { get; }
-    public FrameView ContentTypeFrame { get; }
-    public FrameView ExpirationFrame { get; }
-    public FrameView ValueFrame { get; }
-
     public SecretDetailsPanel(IApplication app, SecretDetailsViewModel viewModel)
     {
         _app = app;
         _viewModel = viewModel;
 
-        ActionsFrame = new FrameView { Title = "Actions", TabStop = TabBehavior.TabGroup };
+        TabStop = TabBehavior.TabGroup;
+
+        _actionsFrame = new FrameView
+        {
+            Title = "Actions",
+            X = 0,
+            Y = 0,
+            Width = Dim.Fill(),
+            Height = 3,
+            TabStop = TabBehavior.TabGroup
+        };
 
         var addVersionButton = new Button
         {
@@ -41,7 +47,7 @@ public sealed class SecretDetailsPanel : View
             Y = 0,
             TabStop = TabBehavior.TabStop
         };
-        addVersionButton.Accepting += (s, e) => AddVersionRequested?.Invoke();
+        addVersionButton.Accepted += (s, e) => AddVersionRequested?.Invoke();
 
         _copyButton = new Button
         {
@@ -51,11 +57,19 @@ public sealed class SecretDetailsPanel : View
             Enabled = false,
             TabStop = TabBehavior.TabStop
         };
-        _copyButton.Accepting += (s, e) => CopySecretValue();
+        _copyButton.Accepted += (s, e) => CopySecretValue();
 
-        ActionsFrame.Add(addVersionButton, _copyButton);
+        _actionsFrame.Add(addVersionButton, _copyButton);
 
-        ContentTypeFrame = new FrameView { Title = "Content Type", TabStop = TabBehavior.TabGroup };
+        _contentTypeFrame = new FrameView
+        {
+            Title = "Content Type",
+            X = 0,
+            Y = Pos.Bottom(_actionsFrame),
+            Width = Dim.Fill(),
+            Height = Dim.Percent(15),
+            TabStop = TabBehavior.TabGroup
+        };
 
         _contentTypeView = new TextView
         {
@@ -68,10 +82,17 @@ public sealed class SecretDetailsPanel : View
             SchemeName = "Base"
         };
 
-        ApplyReadableTextScheme(_contentTypeView);
-        ContentTypeFrame.Add(_contentTypeView);
+        _contentTypeFrame.Add(_contentTypeView);
 
-        ExpirationFrame = new FrameView { Title = "Expiration Date", TabStop = TabBehavior.TabGroup };
+        _expirationFrame = new FrameView
+        {
+            Title = "Expiration Date",
+            X = 0,
+            Y = Pos.Bottom(_contentTypeFrame),
+            Width = Dim.Fill(),
+            Height = 3,
+            TabStop = TabBehavior.TabGroup
+        };
 
         _expirationLabel = new Label
         {
@@ -81,11 +102,19 @@ public sealed class SecretDetailsPanel : View
             Width = Dim.Fill()
         };
 
-        ExpirationFrame.Add(_expirationLabel);
+        _expirationFrame.Add(_expirationLabel);
 
-        ValueFrame = new FrameView { Title = "Secret Value", TabStop = TabBehavior.TabGroup };
+        _valueFrame = new FrameView
+        {
+            Title = "Secret Value",
+            X = 0,
+            Y = Pos.Bottom(_expirationFrame),
+            Width = Dim.Fill(),
+            Height = Dim.Fill(),
+            TabStop = TabBehavior.TabGroup
+        };
 
-        _valueView = new TextView
+        _valueView = new SecretValueTextView(CopySecretValue)
         {
             X = 0,
             Y = 0,
@@ -96,16 +125,11 @@ public sealed class SecretDetailsPanel : View
             SchemeName = "Base"
         };
 
-        ApplyReadableTextScheme(_valueView);
-        ValueFrame.Add(_valueView);
-
-        // Replace default Ctrl+C (text selection copy) with full secret value copy
-        _valueView.KeyBindings.ReplaceCommands(Key.C.WithCtrl, [Command.Copy]);
-        AddCommand(Command.Copy, () => { CopySecretValue(); return true; });
-        _valueView.KeyBindings.Add(Key.C.WithAlt, [Command.Copy]);
+        _valueFrame.Add(_valueView);
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
+        Add(_actionsFrame, _contentTypeFrame, _expirationFrame, _valueFrame);
         RenderFromViewModel();
     }
 
@@ -136,12 +160,6 @@ public sealed class SecretDetailsPanel : View
         });
     }
 
-    public void ApplyTheme()
-    {
-        ApplyReadableTextScheme(_contentTypeView);
-        ApplyReadableTextScheme(_valueView);
-    }
-
     private void RenderFromViewModel()
     {
         _contentTypeView.Text = _viewModel.ContentTypeText;
@@ -164,19 +182,18 @@ public sealed class SecretDetailsPanel : View
         }
     }
 
-    private static void ApplyReadableTextScheme(TextView textView)
+    private sealed class SecretValueTextView : TextView
     {
-        var currentScheme = textView.GetScheme();
-
-        if (currentScheme is null)
+        public SecretValueTextView(Action copyAction)
         {
-            return;
+            AddCommand(Command.Copy, () =>
+            {
+                copyAction();
+                return true;
+            });
+
+            KeyBindings.ReplaceCommands(Key.C.WithCtrl, [Command.Copy]);
+            KeyBindings.Add(Key.C.WithAlt, [Command.Copy]);
         }
-
-        textView.SetScheme(new Scheme(currentScheme)
-        {
-            Editable = currentScheme.Normal,
-            ReadOnly = currentScheme.Normal
-        });
     }
 }

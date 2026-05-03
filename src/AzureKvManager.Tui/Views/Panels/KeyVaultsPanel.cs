@@ -1,5 +1,4 @@
 using System.Collections.ObjectModel;
-using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -65,7 +64,7 @@ public sealed class KeyVaultsPanel : FrameView
         _filterField.Text = filter;
     }
 
-    public async void RefreshKeyVaults()
+    public async Task RefreshKeyVaultsAsync()
     {
         _app.Invoke(() =>
         {

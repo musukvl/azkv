@@ -1,5 +1,3 @@
-using Terminal.Gui;
-using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
@@ -8,11 +6,9 @@ namespace AzureKvManager.Tui.Views.Dialogs;
 
 public sealed record AddSecretResult(string Name, string Value, string? ContentType, DateTime? ExpiresAt);
 
-public sealed class AddSecretDialog : Dialog
+public sealed class AddSecretDialog : Dialog<AddSecretResult>
 {
-    public new AddSecretResult? Result { get; private set; }
-
-    public AddSecretDialog(IApplication app)
+    public AddSecretDialog()
     {
         Title = "Add New Secret";
         Width = Dim.Percent(60);
@@ -90,16 +86,17 @@ public sealed class AddSecretDialog : Dialog
                     out var expiresAt,
                     out var errorMessage))
             {
-                MessageBox.ErrorQuery(app, "Error", errorMessage ?? "Invalid input", "OK");
+                e.Handled = true;
+                MessageBox.ErrorQuery(App!, "Error", errorMessage ?? "Invalid input", "OK");
                 return;
             }
 
             Result = new AddSecretResult(name!, value!, contentType, expiresAt);
+            e.Handled = true;
             RequestStop();
         };
 
         var cancelButton = new Button { Text = "Cancel" };
-        cancelButton.Accepting += (s, e) => RequestStop();
 
         Add(nameLabel, nameField, valueLabel, valueField, contentTypeLabel, contentTypeField,
             expirationDateLabel, expirationDateField);

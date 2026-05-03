@@ -1,5 +1,4 @@
 using System.Globalization;
-using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -73,7 +72,7 @@ public sealed class SecretsPanel : FrameView
             X = 0,
             Y = Pos.Bottom(_tableView)
         };
-        addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
+        addSecretButton.Accepted += (s, e) => ShowAddSecretDialog();
 
         var reloadButton = new Button
         {
@@ -81,7 +80,7 @@ public sealed class SecretsPanel : FrameView
             X = Pos.Right(addSecretButton) + 1,
             Y = Pos.Bottom(_tableView)
         };
-        reloadButton.Accepting += async (s, e) => await ReloadSecrets();
+        reloadButton.Accepted += (s, e) => _ = ReloadSecrets();
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
@@ -173,7 +172,7 @@ public sealed class SecretsPanel : FrameView
             return;
         }
 
-        var dialog = new AddSecretDialog(_app);
+        using var dialog = new AddSecretDialog();
         _app.Run(dialog);
 
         if (dialog.Result is null)
