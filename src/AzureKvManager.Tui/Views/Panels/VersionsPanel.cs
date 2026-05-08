@@ -112,7 +112,7 @@ public sealed class VersionsPanel : FrameView
 
     private void OnVersionSelectionChanged(object? sender, ValueChangedEventArgs<TableSelection?> args)
     {
-        if (!_viewModel.TrySelectByIndex(args.NewValue?.Cursor.Y ?? -1, out var selectedVersion) || selectedVersion is null)
+        if (!_viewModel.TrySelectByIndex(args.NewValue?.SelectedCell.Y ?? -1, out var selectedVersion) || selectedVersion is null)
         {
             return;
         }

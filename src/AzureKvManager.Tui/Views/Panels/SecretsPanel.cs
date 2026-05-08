@@ -156,7 +156,7 @@ public sealed class SecretsPanel : FrameView
 
     private void OnSecretSelectionChanged(object? sender, ValueChangedEventArgs<TableSelection?> args)
     {
-        if (!_viewModel.TrySelectByIndex(args.NewValue?.Cursor.Y ?? -1, out var selectedSecret) || selectedSecret is null)
+        if (!_viewModel.TrySelectByIndex(args.NewValue?.SelectedCell.Y ?? -1, out var selectedSecret) || selectedSecret is null)
         {
             return;
         }
