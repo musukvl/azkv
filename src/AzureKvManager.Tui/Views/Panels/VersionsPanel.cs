@@ -1,5 +1,4 @@
 using System.Globalization;
-using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -41,7 +40,7 @@ public sealed class VersionsPanel : FrameView
         _tableView.Style.ExpandLastColumn = true;
 
         SetTableSource([]);
-        _tableView.SelectedCellChanged += OnVersionSelectionChanged;
+        _tableView.ValueChanged += OnVersionSelectionChanged;
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
@@ -89,9 +88,9 @@ public sealed class VersionsPanel : FrameView
         SetTableSource(_viewModel.Versions);
 
         // Deselect to avoid auto-selecting first row after data changes
-        _tableView.SelectedCellChanged -= OnVersionSelectionChanged;
-        _tableView.SelectedRow = -1;
-        _tableView.SelectedCellChanged += OnVersionSelectionChanged;
+        _tableView.ValueChanged -= OnVersionSelectionChanged;
+        _tableView.Value = null!;
+        _tableView.ValueChanged += OnVersionSelectionChanged;
     }
 
     private void SetTableSource(IEnumerable<SecretVersion> versions)
@@ -111,9 +110,9 @@ public sealed class VersionsPanel : FrameView
         _tableView.Update();
     }
 
-    private void OnVersionSelectionChanged(object? sender, SelectedCellChangedEventArgs args)
+    private void OnVersionSelectionChanged(object? sender, ValueChangedEventArgs<TableSelection?> args)
     {
-        if (!_viewModel.TrySelectByIndex(args.NewRow, out var selectedVersion) || selectedVersion is null)
+        if (!_viewModel.TrySelectByIndex(args.NewValue?.SelectedCell.Y ?? -1, out var selectedVersion) || selectedVersion is null)
         {
             return;
         }

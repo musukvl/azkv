@@ -1,4 +1,3 @@
-using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
@@ -23,12 +22,11 @@ public class MainWindow : Window
     private readonly SecretDetailsPanel _detailsPanel;
     private readonly StatusBar _statusBar;
     private readonly Shortcut _statusShortcut;
-    private readonly object _statusLock = new();
 
-    private CancellationTokenSource? _spinnerCts;
+    private object? _spinnerTimeoutToken;
     private string _spinnerMessage = "Loading Key Vaults...";
     private int _spinnerFrameIndex;
-    private long _spinnerGeneration;
+    private bool _initialLoadStarted;
     private string? _activeErrorDetails;
 
     public MainWindow(IApplication app, MainWindowViewModel viewModel, string? initialFilter = null)
@@ -43,7 +41,7 @@ public class MainWindow : Window
             Menus =
             [
                 new("_File", [
-                    new MenuItem("_Refresh All", "", () => _keyVaultsPanel!.RefreshKeyVaults()),
+                    new MenuItem("_Refresh All", "", () => _ = _keyVaultsPanel!.RefreshKeyVaultsAsync()),
                     new MenuItem("_Quit", "", () => _app.RequestStop())
                 ]),
                 new("_Theme", ThemeProvider.GetThemeNames()
@@ -81,27 +79,13 @@ public class MainWindow : Window
             Height = Dim.Percent(35)
         };
 
-        _detailsPanel = new SecretDetailsPanel(app, viewModel.SecretDetails);
-
-        _detailsPanel.ActionsFrame.X = Pos.Right(_secretsPanel);
-        _detailsPanel.ActionsFrame.Y = Pos.Bottom(_versionsPanel);
-        _detailsPanel.ActionsFrame.Width = Dim.Fill();
-        _detailsPanel.ActionsFrame.Height = 3;
-
-        _detailsPanel.ContentTypeFrame.X = Pos.Right(_secretsPanel);
-        _detailsPanel.ContentTypeFrame.Y = Pos.Bottom(_detailsPanel.ActionsFrame);
-        _detailsPanel.ContentTypeFrame.Width = Dim.Fill();
-        _detailsPanel.ContentTypeFrame.Height = Dim.Percent(15);
-
-        _detailsPanel.ExpirationFrame.X = Pos.Right(_secretsPanel);
-        _detailsPanel.ExpirationFrame.Y = Pos.Bottom(_detailsPanel.ContentTypeFrame);
-        _detailsPanel.ExpirationFrame.Width = Dim.Fill();
-        _detailsPanel.ExpirationFrame.Height = 3;
-
-        _detailsPanel.ValueFrame.X = Pos.Right(_secretsPanel);
-        _detailsPanel.ValueFrame.Y = Pos.Bottom(_detailsPanel.ExpirationFrame);
-        _detailsPanel.ValueFrame.Width = Dim.Fill();
-        _detailsPanel.ValueFrame.Height = Dim.Fill(2);
+        _detailsPanel = new SecretDetailsPanel(app, viewModel.SecretDetails)
+        {
+            X = Pos.Right(_secretsPanel),
+            Y = Pos.Bottom(_versionsPanel),
+            Width = Dim.Fill(),
+            Height = Dim.Fill(2)
+        };
 
         _statusShortcut = new Shortcut
         {
@@ -116,10 +100,7 @@ public class MainWindow : Window
             _statusShortcut
         ]);
 
-        Add(_keyVaultsPanel, _secretsPanel, _versionsPanel,
-            _detailsPanel.ActionsFrame, _detailsPanel.ContentTypeFrame,
-            _detailsPanel.ExpirationFrame, _detailsPanel.ValueFrame,
-            _statusBar);
+        Add(_keyVaultsPanel, _secretsPanel, _versionsPanel, _detailsPanel, _statusBar);
 
         // Wire events
         _keyVaultsPanel.KeyVaultSelected += OnKeyVaultSelected;
@@ -139,12 +120,20 @@ public class MainWindow : Window
         {
             _keyVaultsPanel.SetInitialFilter(initialFilter);
         }
+    }
 
-        // Keep initial state animated until first operation result arrives.
+    protected override void OnIsRunningChanged(bool newIsRunning)
+    {
+        base.OnIsRunningChanged(newIsRunning);
+
+        if (!newIsRunning || _initialLoadStarted)
+        {
+            return;
+        }
+
+        _initialLoadStarted = true;
         UpdateStatus("Loading Key Vaults...");
-
-        // Load key vaults on startup
-        Task.Run(() => _keyVaultsPanel.RefreshKeyVaults());
+        _ = _keyVaultsPanel.RefreshKeyVaultsAsync();
     }
 
     private void OnKeyVaultSelected(KeyVault keyVault)
@@ -191,7 +180,7 @@ public class MainWindow : Window
             return;
         }
 
-        var dialog = new AddVersionDialog(_app, _viewModel.SelectedSecretName);
+        using var dialog = new AddVersionDialog(_viewModel.SelectedSecretName);
         _app.Run(dialog);
 
         if (dialog.Result is null)
@@ -234,7 +223,6 @@ public class MainWindow : Window
     private void SwitchTheme(string themeName)
     {
         ThemeProvider.ApplyTheme(themeName);
-        _detailsPanel.ApplyTheme();
         SetNeedsDraw();
     }
 
@@ -300,28 +288,17 @@ public class MainWindow : Window
 
     private void SetActiveError(string message)
     {
-        lock (_statusLock)
-        {
-            _activeErrorDetails = message;
-        }
+        _activeErrorDetails = message;
     }
 
     private void ClearActiveError()
     {
-        lock (_statusLock)
-        {
-            _activeErrorDetails = null;
-        }
+        _activeErrorDetails = null;
     }
 
     private void OnStatusShortcutActivated()
     {
-        string? errorDetails;
-
-        lock (_statusLock)
-        {
-            errorDetails = _activeErrorDetails;
-        }
+        var errorDetails = _activeErrorDetails;
 
         if (string.IsNullOrWhiteSpace(errorDetails))
         {
@@ -333,82 +310,45 @@ public class MainWindow : Window
 
     private void StartSpinner(string message)
     {
-        CancellationToken token;
-        long generation;
+        _spinnerMessage = message;
 
-        lock (_statusLock)
-        {
-            _spinnerMessage = message;
-
-            if (_spinnerCts is not null)
-            {
-                return;
-            }
-
-            _spinnerFrameIndex = 0;
-            _spinnerCts = new CancellationTokenSource();
-            generation = ++_spinnerGeneration;
-            token = _spinnerCts.Token;
-        }
-
-        _ = RunSpinnerAsync(generation, token);
-    }
-
-    private void StopSpinner()
-    {
-        CancellationTokenSource? cts;
-
-        lock (_statusLock)
-        {
-            cts = _spinnerCts;
-            _spinnerCts = null;
-            _spinnerGeneration++;
-        }
-
-        if (cts is null)
+        if (_spinnerTimeoutToken is not null)
         {
             return;
         }
 
-        cts.Cancel();
-        cts.Dispose();
+        _spinnerFrameIndex = 0;
+        RenderSpinnerFrame();
+        _spinnerTimeoutToken = _app.AddTimeout(TimeSpan.FromMilliseconds(120), UpdateSpinner);
     }
 
-    private async Task RunSpinnerAsync(long generation, CancellationToken token)
+    private void StopSpinner()
     {
-        while (!token.IsCancellationRequested)
+        if (_spinnerTimeoutToken is not { } token)
         {
-            string frame;
-            string message;
-
-            lock (_statusLock)
-            {
-                if (generation != _spinnerGeneration)
-                {
-                    return;
-                }
-
-                frame = SpinnerFrames[_spinnerFrameIndex % SpinnerFrames.Length];
-                _spinnerFrameIndex++;
-                message = _spinnerMessage;
-            }
-
-            if (token.IsCancellationRequested)
-            {
-                return;
-            }
-
-            _app.Invoke(() => SetStatusLine($"{frame} {message}"));
-
-            try
-            {
-                await Task.Delay(120, token);
-            }
-            catch (OperationCanceledException)
-            {
-                return;
-            }
+            return;
         }
+
+        _spinnerTimeoutToken = null;
+        _app.RemoveTimeout(token);
+    }
+
+    private bool UpdateSpinner()
+    {
+        if (_spinnerTimeoutToken is null)
+        {
+            return false;
+        }
+
+        RenderSpinnerFrame();
+        return true;
+    }
+
+    private void RenderSpinnerFrame()
+    {
+        var frame = SpinnerFrames[_spinnerFrameIndex % SpinnerFrames.Length];
+        _spinnerFrameIndex++;
+        SetStatusLine($"{frame} {_spinnerMessage}");
     }
 
     private void SetStatusLine(string message)

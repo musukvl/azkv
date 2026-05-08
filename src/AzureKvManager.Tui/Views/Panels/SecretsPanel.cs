@@ -1,5 +1,4 @@
 using System.Globalization;
-using Terminal.Gui;
 using Terminal.Gui.App;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
@@ -65,7 +64,7 @@ public sealed class SecretsPanel : FrameView
         _tableView.Style.ShowHorizontalHeaderUnderline = false;
 
         SetTableSource([]);
-        _tableView.SelectedCellChanged += OnSecretSelectionChanged;
+        _tableView.ValueChanged += OnSecretSelectionChanged;
 
         var addSecretButton = new Button
         {
@@ -73,7 +72,7 @@ public sealed class SecretsPanel : FrameView
             X = 0,
             Y = Pos.Bottom(_tableView)
         };
-        addSecretButton.Accepting += (s, e) => ShowAddSecretDialog();
+        addSecretButton.Accepted += (s, e) => ShowAddSecretDialog();
 
         var reloadButton = new Button
         {
@@ -81,7 +80,7 @@ public sealed class SecretsPanel : FrameView
             X = Pos.Right(addSecretButton) + 1,
             Y = Pos.Bottom(_tableView)
         };
-        reloadButton.Accepting += async (s, e) => await ReloadSecrets();
+        reloadButton.Accepted += (s, e) => _ = ReloadSecrets();
 
         _viewModel.StateChanged += () => _app.Invoke(RenderFromViewModel);
 
@@ -155,9 +154,9 @@ public sealed class SecretsPanel : FrameView
         _tableView.Update();
     }
 
-    private void OnSecretSelectionChanged(object? sender, SelectedCellChangedEventArgs args)
+    private void OnSecretSelectionChanged(object? sender, ValueChangedEventArgs<TableSelection?> args)
     {
-        if (!_viewModel.TrySelectByIndex(args.NewRow, out var selectedSecret) || selectedSecret is null)
+        if (!_viewModel.TrySelectByIndex(args.NewValue?.SelectedCell.Y ?? -1, out var selectedSecret) || selectedSecret is null)
         {
             return;
         }
@@ -173,7 +172,7 @@ public sealed class SecretsPanel : FrameView
             return;
         }
 
-        var dialog = new AddSecretDialog(_app);
+        using var dialog = new AddSecretDialog();
         _app.Run(dialog);
 
         if (dialog.Result is null)

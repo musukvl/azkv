@@ -44,8 +44,7 @@ class Program
 
         ThemeProvider.Initialize();
 
-        using IApplication app = Application.Create();
-        app.Init();
+        using IApplication app = Application.Create().Init();
 
         if (!string.IsNullOrEmpty(themeName))
         {
