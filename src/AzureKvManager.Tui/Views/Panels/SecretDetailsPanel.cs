@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Type is obsolete
+
 using Terminal.Gui.App;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;

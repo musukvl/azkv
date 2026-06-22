@@ -1,3 +1,5 @@
+#pragma warning disable CS0618 // Type is obsolete
+
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
