@@ -1,6 +1,6 @@
 # Azure Key Vault Manager - Terminal UI
 
-A terminal-based user interface application for managing Azure Key Vaults, built with [Terminal.Gui](https://github.com/gui-cs/Terminal.Gui).
+A terminal-based user interface application for managing Azure Key Vaults, built with [Terminal.Gui](https://github.com/tui-cs/Terminal.Gui).
 
 ## Overview
 
