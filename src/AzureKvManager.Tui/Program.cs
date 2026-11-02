@@ -1,3 +1,4 @@
+using System.Reflection;
 using Terminal.Gui.App;
 using AzureKvManager.Tui.Views;
 using AzureKvManager.Tui.Services;
@@ -18,6 +19,12 @@ class Program
             return 0;
         }
 
+        if (args.Length > 0 && (args[0] == "--version" || args[0] == "-v"))
+        {
+            Console.WriteLine(GetVersion());
+            return 0;
+        }
+
         var app = new CommandApp<LaunchCommand>();
         app.Configure(config =>
         {
@@ -25,6 +32,22 @@ class Program
         });
 
         return app.Run(args);
+    }
+
+    static string GetVersion()
+    {
+        var assembly = Assembly.GetExecutingAssembly();
+        var informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
+        if (string.IsNullOrWhiteSpace(informational))
+        {
+            return assembly.GetName().Version?.ToString() ?? "unknown";
+        }
+
+        // The SDK appends "+<commit sha>" source-control metadata.
+        var metadataIndex = informational.IndexOf('+');
+
+        return metadataIndex < 0 ? informational : informational[..metadataIndex];
     }
 
     static int RunApplication(string? subscription, string? themeName, string? filter)
@@ -59,7 +82,7 @@ class Program
 
     sealed class LaunchCommand : Command<LaunchSettings>
     {
-        protected override int Execute(CommandContext context, LaunchSettings settings, CancellationToken cancellationToken)
+        public override int Execute(CommandContext context, LaunchSettings settings, CancellationToken cancellationToken)
         {
             return RunApplication(settings.Subscription, settings.ThemeName, settings.Filter);
         }
@@ -96,6 +119,7 @@ class Program
         AnsiConsole.MarkupLine("  [cyan]-s, --subscription[/] [grey]<NAME>[/]   Switch to the specified Azure subscription");
         AnsiConsole.MarkupLine("  [cyan]-t, --theme[/] [grey]<NAME>[/]          Set color theme");
         AnsiConsole.MarkupLine($"                                     [grey]Themes:[/] {Markup.Escape(availableThemes)}");
+        AnsiConsole.MarkupLine("  [cyan]-v, --version[/]                        Show the application version");
         AnsiConsole.MarkupLine("  [cyan]-h, --help[/]                           Show this help message");
         AnsiConsole.WriteLine();
         

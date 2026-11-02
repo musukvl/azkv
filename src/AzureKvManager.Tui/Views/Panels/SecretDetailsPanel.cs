@@ -1,11 +1,10 @@
-#pragma warning disable CS0618 // Type is obsolete
-
 using Terminal.Gui.App;
 using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Models;
 using AzureKvManager.Tui.ViewModels;
+using AzureKvManager.Tui.Views.Controls;
 
 namespace AzureKvManager.Tui.Views.Panels;
 
@@ -18,9 +17,9 @@ public sealed class SecretDetailsPanel : View
     private readonly FrameView _contentTypeFrame;
     private readonly FrameView _expirationFrame;
     private readonly FrameView _valueFrame;
-    private readonly TextView _contentTypeView;
+    private readonly MultilineTextView _contentTypeView;
     private readonly Label _expirationLabel;
-    private readonly TextView _valueView;
+    private readonly MultilineTextView _valueView;
 
     public event Action? AddVersionRequested;
     public event Action<string>? StatusChanged;
@@ -73,7 +72,7 @@ public sealed class SecretDetailsPanel : View
             TabStop = TabBehavior.TabGroup
         };
 
-        _contentTypeView = new TextView
+        _contentTypeView = new MultilineTextView
         {
             X = 0,
             Y = 0,
@@ -184,7 +183,7 @@ public sealed class SecretDetailsPanel : View
         }
     }
 
-    private sealed class SecretValueTextView : TextView
+    private sealed class SecretValueTextView : MultilineTextView
     {
         public SecretValueTextView(Action copyAction)
         {

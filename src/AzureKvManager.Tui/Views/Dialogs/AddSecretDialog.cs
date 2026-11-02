@@ -1,8 +1,8 @@
-#pragma warning disable CS0618 // Type is obsolete
-
+using Terminal.Gui.Input;
 using Terminal.Gui.ViewBase;
 using Terminal.Gui.Views;
 using AzureKvManager.Tui.Services;
+using AzureKvManager.Tui.Views.Controls;
 
 namespace AzureKvManager.Tui.Views.Dialogs;
 
@@ -10,6 +10,11 @@ public sealed record AddSecretResult(string Name, string Value, string? ContentT
 
 public sealed class AddSecretDialog : Dialog<AddSecretResult>
 {
+    private readonly TextField _nameField;
+    private readonly MultilineTextView _valueField;
+    private readonly TextField _contentTypeField;
+    private readonly TextField _expirationDateField;
+
     public AddSecretDialog()
     {
         Title = "Add New Secret";
@@ -23,7 +28,7 @@ public sealed class AddSecretDialog : Dialog<AddSecretResult>
             Y = 1
         };
 
-        var nameField = new TextField
+        _nameField = new TextField
         {
             X = 1,
             Y = Pos.Bottom(nameLabel),
@@ -34,10 +39,10 @@ public sealed class AddSecretDialog : Dialog<AddSecretResult>
         {
             Text = "Secret _Value:",
             X = 1,
-            Y = Pos.Bottom(nameField) + 1
+            Y = Pos.Bottom(_nameField) + 1
         };
 
-        var valueField = new TextView
+        _valueField = new MultilineTextView
         {
             X = 1,
             Y = Pos.Bottom(valueLabel),
@@ -49,10 +54,10 @@ public sealed class AddSecretDialog : Dialog<AddSecretResult>
         {
             Text = "_Content Type (optional):",
             X = 1,
-            Y = Pos.Bottom(valueField) + 1
+            Y = Pos.Bottom(_valueField) + 1
         };
 
-        var contentTypeField = new TextField
+        _contentTypeField = new TextField
         {
             X = 1,
             Y = Pos.Bottom(contentTypeLabel),
@@ -63,48 +68,59 @@ public sealed class AddSecretDialog : Dialog<AddSecretResult>
         {
             Text = "_Expiration Date (yyyy-MM-dd, optional):",
             X = 1,
-            Y = Pos.Bottom(contentTypeField) + 1
+            Y = Pos.Bottom(_contentTypeField) + 1
         };
 
-        var expirationDateField = new TextField
+        _expirationDateField = new TextField
         {
             X = 1,
             Y = Pos.Bottom(expirationDateLabel),
             Width = Dim.Fill(1)
         };
 
-        var okButton = new Button { Text = "OK" };
-        okButton.Accepting += (s, e) =>
-        {
-            var name = nameField.Text?.ToString()?.Trim();
-            var value = valueField.Text?.ToString()?.Trim();
-            var contentType = contentTypeField.Text?.ToString()?.Trim();
-            var expirationDateText = expirationDateField.Text?.ToString();
-
-            if (!SecretFormValidator.TryValidateNewSecret(
-                    name,
-                    value,
-                    expirationDateText,
-                    out var expiresAt,
-                    out var errorMessage))
-            {
-                e.Handled = true;
-                MessageBox.ErrorQuery(App!, "Error", errorMessage ?? "Invalid input", "OK");
-                return;
-            }
-
-            Result = new AddSecretResult(name!, value!, contentType, expiresAt);
-            e.Handled = true;
-            RequestStop();
-        };
-
-        var cancelButton = new Button { Text = "Cancel" };
-
-        Add(nameLabel, nameField, valueLabel, valueField, contentTypeLabel, contentTypeField,
-            expirationDateLabel, expirationDateField);
+        Add(nameLabel, _nameField, valueLabel, _valueField, contentTypeLabel, _contentTypeField,
+            expirationDateLabel, _expirationDateField);
 
         // AddButton manages layout; last added becomes default
-        AddButton(cancelButton);
-        AddButton(okButton);
+        AddButton(new Button { Text = "Cancel" });
+        AddButton(new Button { Text = "OK" });
+    }
+
+    protected override bool OnAccepting(CommandEventArgs args)
+    {
+        View? source = null;
+        args.Context?.Source?.TryGetTarget(out source);
+
+        // Cancel closes with a null Result. Everything else (OK, or Enter inside a field,
+        // which bubbles Command.Accept up to the dialog) submits the form.
+        if (source is IAcceptTarget { IsDefault: false })
+        {
+            return base.OnAccepting(args);
+        }
+
+        var name = _nameField.Text.Trim();
+        var value = _valueField.Text.Trim();
+        var contentType = _contentTypeField.Text.Trim();
+
+        if (!SecretFormValidator.TryValidateNewSecret(
+                name,
+                value,
+                _expirationDateField.Text,
+                out var expiresAt,
+                out var errorMessage))
+        {
+            args.Handled = true;
+            MessageBox.ErrorQuery(App!, "Error", errorMessage ?? "Invalid input", "OK");
+
+            return true;
+        }
+
+        Result = new AddSecretResult(
+            name,
+            value,
+            string.IsNullOrEmpty(contentType) ? null : contentType,
+            expiresAt);
+
+        return base.OnAccepting(args);
     }
 }
